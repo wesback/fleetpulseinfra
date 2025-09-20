@@ -1,0 +1,139 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform-deploy.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform-deploy.yml'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: "1.6.0"
+  ARM_USE_OIDC: true
+  ARM_USE_AZUREAD: true
+  ARM_STORAGE_USE_AZUREAD: true
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    environment: production
+    
+    # Use OIDC for authentication
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login via OIDC
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Format Check
+      working-directory: ./infra/terraform/envs/prod
+      run: terraform fmt -check -recursive
+
+    - name: Terraform Init
+      working-directory: ./infra/terraform/envs/prod
+      run: terraform init
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Terraform Validate
+      working-directory: ./infra/terraform/envs/prod
+      run: terraform validate
+
+    - name: Terraform Plan
+      working-directory: ./infra/terraform/envs/prod
+      run: terraform plan -out=tfplan -var-file="terraform.tfvars"
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: ./infra/terraform/envs/prod
+      run: terraform apply -auto-approve tfplan
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Terraform Output
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: ./infra/terraform/envs/prod
+      run: |
+        echo "## Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        terraform output >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    # Save outputs for post-deploy job
+    - name: Save Terraform Outputs
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: ./infra/terraform/envs/prod
+      run: |
+        terraform output -json > terraform-outputs.json
+        echo "STORAGE_ACCOUNT_NAME=$(terraform output -raw storage_account_name)" >> $GITHUB_ENV
+        echo "KEY_VAULT_NAME=$(terraform output -raw key_vault_name)" >> $GITHUB_ENV
+        echo "ACA_ENV_ID=$(terraform output -raw resource_ids | jq -r '.container_app_environment_id')" >> $GITHUB_ENV
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Upload Terraform Outputs
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-outputs
+        path: infra/terraform/envs/prod/terraform-outputs.json
+        retention-days: 1
+
+  security-scan:
+    name: 'Security Scan'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Run Checkov scan
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: ./infra/terraform
+        framework: terraform
+        output_format: sarif
+        output_file_path: checkov-results.sarif
+        quiet: true
+        soft_fail: true
+
+    - name: Upload Checkov scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: checkov-results.sarif

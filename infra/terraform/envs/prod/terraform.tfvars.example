@@ -1,0 +1,78 @@
+# FleetPulse Production Environment Configuration
+# Copy this file to terraform.tfvars and update with actual values
+
+# Basic Configuration
+resource_group_name = "rg-fleetpulse-prod"
+location           = "West Europe"
+environment        = "prod"
+project_name       = "fleetpulse"
+
+# Networking - Update with your actual network ranges
+vnet_cidr = "10.20.0.0/24"
+subnet_cidrs = {
+  aca_infra             = "10.20.0.0/27"
+  gateway               = "10.20.0.32/27"
+  privatelink           = "10.20.0.64/27"
+  firewall              = "10.20.0.96/27"
+  dns_resolver_inbound  = "10.20.0.128/27"
+}
+
+# IMPORTANT: Update with your actual home/office network CIDRs
+home_cidrs = [
+  "192.168.0.0/24",    # TODO: Replace with actual home network
+  "10.0.0.0/24"        # TODO: Add additional trusted networks
+]
+
+# VPN Configuration - Update with your OPNsense details
+vpn_gateway_sku          = "VpnGw1"
+on_premises_gateway_ip   = "203.0.113.1"  # TODO: Replace with OPNsense public IP
+on_premises_networks     = [
+  "192.168.0.0/24"       # TODO: Replace with actual on-premises networks
+]
+vpn_shared_key          = "CHANGE-ME-STRONG-PSK-HERE"  # TODO: Generate strong PSK
+
+# Container Images - Pin to specific versions for production
+container_images = {
+  backend   = "wesback/fleetpulse-backend:latest"  # TODO: Pin to specific tag
+  frontend  = "wesback/fleetpulse-frontend:latest" # TODO: Pin to specific tag
+  otel      = "otel/opentelemetry-collector-contrib:0.91.0"
+}
+
+# Custom Domains - Update with your actual domains
+custom_domains = {
+  backend   = "backend.backelant.eu"     # TODO: Update domain
+  frontend  = "frontend.backelant.eu"    # TODO: Update domain
+  wildcard  = "*.backelant.eu"           # TODO: Update wildcard domain
+}
+
+# Resource Sizing - Adjust based on workload requirements
+aca_workload_profile = {
+  name                    = "Consumption"
+  workload_profile_type   = "Consumption"
+  minimum_count          = 0
+  maximum_count          = 10
+}
+
+app_resources = {
+  backend = {
+    cpu    = 0.5
+    memory = "1Gi"
+  }
+  frontend = {
+    cpu    = 0.25
+    memory = "0.5Gi"
+  }
+  otel = {
+    cpu    = 0.25
+    memory = "0.5Gi"
+  }
+}
+
+# Tags - Update with your organization's tagging strategy
+tags = {
+  Environment = "prod"
+  Project     = "fleetpulse"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+  CostCenter  = "engineering"    # TODO: Add your cost center
+}
