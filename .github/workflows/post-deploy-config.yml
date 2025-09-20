@@ -1,0 +1,152 @@
+name: Post-Deploy Configuration
+
+on:
+  workflow_run:
+    workflows: ["Terraform Deploy"]
+    branches: [main]
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  ARM_USE_OIDC: true
+  ARM_USE_AZUREAD: true
+
+jobs:
+  post-deploy:
+    name: 'Configure ACA Environment Storage and Certificates'
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: production
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login via OIDC
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Download Terraform Outputs
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-outputs
+        path: ./
+
+    - name: Extract Configuration Values
+      run: |
+        STORAGE_ACCOUNT_NAME=$(jq -r '.storage_account_name.value' terraform-outputs.json)
+        KEY_VAULT_NAME=$(jq -r '.key_vault_name.value' terraform-outputs.json)
+        ACA_ENV_ID=$(jq -r '.resource_ids.value.container_app_environment_id' terraform-outputs.json)
+        RESOURCE_GROUP_NAME=$(echo $ACA_ENV_ID | cut -d'/' -f5)
+        
+        echo "STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME" >> $GITHUB_ENV
+        echo "KEY_VAULT_NAME=$KEY_VAULT_NAME" >> $GITHUB_ENV
+        echo "ACA_ENV_ID=$ACA_ENV_ID" >> $GITHUB_ENV
+        echo "RESOURCE_GROUP_NAME=$RESOURCE_GROUP_NAME" >> $GITHUB_ENV
+        echo "ACA_ENV_NAME=$(echo $ACA_ENV_ID | cut -d'/' -f9)" >> $GITHUB_ENV
+
+    - name: Get Storage Account Key
+      run: |
+        echo "Retrieving storage account key for: $STORAGE_ACCOUNT_NAME"
+        STORAGE_KEY=$(az storage account keys list \
+          --account-name $STORAGE_ACCOUNT_NAME \
+          --resource-group $RESOURCE_GROUP_NAME \
+          --query '[0].value' -o tsv)
+        
+        # Store the key in Key Vault for future reference
+        az keyvault secret set \
+          --vault-name $KEY_VAULT_NAME \
+          --name storage-account-key \
+          --value "$STORAGE_KEY" \
+          --description "Azure Storage account key for Azure Files"
+        
+        echo "STORAGE_KEY=$STORAGE_KEY" >> $GITHUB_ENV
+
+    - name: Configure Container App Environment Storage
+      run: |
+        echo "Configuring Azure Files storage for Container App Environment: $ACA_ENV_NAME"
+        
+        # Create the storage configuration for the ACA environment
+        az containerapp env storage set \
+          --name $ACA_ENV_NAME \
+          --resource-group $RESOURCE_GROUP_NAME \
+          --storage-name "files" \
+          --azure-file-account-name $STORAGE_ACCOUNT_NAME \
+          --azure-file-account-key "$STORAGE_KEY" \
+          --azure-file-share-name "fleetpulse" \
+          --access-mode ReadWrite
+        
+        echo "✅ Azure Files storage configured successfully"
+
+    # Certificate management (requires certificates to be uploaded to Key Vault manually)
+    - name: Configure Custom Domains and Certificates
+      run: |
+        echo "Checking for SSL certificates in Key Vault..."
+        
+        # Check if SSL certificate exists in Key Vault
+        if az keyvault secret show --vault-name $KEY_VAULT_NAME --name ssl-cert-pfx >/dev/null 2>&1; then
+          echo "SSL certificate found in Key Vault, configuring custom domains..."
+          
+          # Note: This is a placeholder for certificate configuration
+          # In a real deployment, you would:
+          # 1. Download the PFX certificate from Key Vault
+          # 2. Upload it to the Container App Environment
+          # 3. Bind custom domains to the applications
+          
+          echo "⚠️ Manual step required: Upload SSL certificate to Container App Environment"
+          echo "Commands to run manually:"
+          echo "1. az containerapp env certificate upload --name $ACA_ENV_NAME --resource-group $RESOURCE_GROUP_NAME --certificate-file cert.pfx --certificate-password 'password'"
+          echo "2. az containerapp hostname bind --hostname backend.backelant.eu --app fleetpulse-prod-backend --resource-group $RESOURCE_GROUP_NAME --environment $ACA_ENV_NAME"
+          echo "3. az containerapp hostname bind --hostname frontend.backelant.eu --app fleetpulse-prod-frontend --resource-group $RESOURCE_GROUP_NAME --environment $ACA_ENV_NAME"
+        else
+          echo "⚠️ SSL certificate not found in Key Vault"
+          echo "Please upload your *.backelant.eu certificate to Key Vault with the name 'ssl-cert-pfx'"
+        fi
+
+    - name: Validate Configuration
+      continue-on-error: true
+      run: |
+        echo "Validating Container App Environment configuration..."
+        
+        # Check storage configuration
+        az containerapp env storage show \
+          --name $ACA_ENV_NAME \
+          --resource-group $RESOURCE_GROUP_NAME \
+          --storage-name "files"
+        
+        # List Container Apps
+        echo "Container Apps in environment:"
+        az containerapp list \
+          --environment $ACA_ENV_NAME \
+          --resource-group $RESOURCE_GROUP_NAME \
+          --query '[].{Name:name,Status:properties.provisioningState,FQDN:properties.configuration.ingress.fqdn}' \
+          --output table
+
+    - name: Output DNS Configuration
+      run: |
+        echo "## DNS Configuration Required" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Configure the following DNS records in your Technitium DNS server:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        ACA_STATIC_IP=$(jq -r '.container_app_environment_static_ip.value' terraform-outputs.json)
+        DNS_RESOLVER_IP=$(jq -r '.dns_resolver_inbound_ip.value' terraform-outputs.json)
+        
+        echo "**A Records (point to ACA Internal Load Balancer):**" >> $GITHUB_STEP_SUMMARY
+        echo "- backend.backelant.eu → $ACA_STATIC_IP" >> $GITHUB_STEP_SUMMARY
+        echo "- frontend.backelant.eu → $ACA_STATIC_IP" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Conditional Forwarders (point to DNS Private Resolver):**" >> $GITHUB_STEP_SUMMARY
+        echo "- privatelink.vaultcore.azure.net → $DNS_RESOLVER_IP" >> $GITHUB_STEP_SUMMARY
+        echo "- privatelink.file.core.windows.net → $DNS_RESOLVER_IP" >> $GITHUB_STEP_SUMMARY
+        echo "- privatelink.monitor.azure.com → $DNS_RESOLVER_IP" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "See docs/technitium-dns.md for detailed configuration instructions." >> $GITHUB_STEP_SUMMARY

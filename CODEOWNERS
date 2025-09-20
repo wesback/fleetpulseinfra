@@ -1,0 +1,36 @@
+# Code Ownership and Review Requirements
+#
+# This file defines code ownership and review requirements for the FleetPulse
+# Azure infrastructure repository. All changes require review from appropriate
+# code owners before merging.
+
+# Global ownership - Platform team owns everything by default
+* @wesback
+
+# Infrastructure code requires platform team review
+/infra/ @wesback
+
+# Terraform modules require architecture review
+/infra/terraform/modules/ @wesback
+
+# Production environment requires additional approval
+/infra/terraform/envs/prod/ @wesback
+
+# CI/CD workflows require DevOps review
+/.github/workflows/ @wesback
+
+# Security-related files require security team review
+/SECURITY.md @wesback
+/docs/blog.md @wesback
+
+# Documentation updates
+/docs/ @wesback
+/README.md @wesback
+
+# Configuration files
+/.gitignore @wesback
+/CODEOWNERS @wesback
+
+# Examples and templates can be reviewed by any team member
+*.example @wesback
+*.template @wesback
