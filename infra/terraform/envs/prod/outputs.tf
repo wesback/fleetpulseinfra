@@ -45,14 +45,14 @@ output "dns_configuration" {
       (var.custom_domains.backend)  = module.aca_env.static_ip
       (var.custom_domains.frontend) = module.aca_env.static_ip
     }
-    
+
     # Configure these conditional forwarders to DNS Resolver inbound IP
     conditional_forwarders = {
       "privatelink.vaultcore.azure.net"   = module.dns_resolver.inbound_endpoint_ip
       "privatelink.file.core.windows.net" = module.dns_resolver.inbound_endpoint_ip
       "privatelink.monitor.azure.com"     = module.dns_resolver.inbound_endpoint_ip
     }
-    
+
     # Wildcard DNS zone for Container App Environment
     wildcard_zone = {
       zone = module.aca_env.default_domain
@@ -65,11 +65,11 @@ output "dns_configuration" {
 output "resource_ids" {
   description = "Resource IDs for CI/CD pipelines"
   value = {
-    resource_group_id                = azurerm_resource_group.main.id
-    container_app_environment_id     = module.aca_env.container_app_environment_id
-    key_vault_id                     = module.keyvault.key_vault_id
-    storage_account_id               = module.storage.storage_account_id
-    log_analytics_workspace_id      = module.monitor.log_analytics_workspace_id
+    resource_group_id            = azurerm_resource_group.main.id
+    container_app_environment_id = module.aca_env.container_app_environment_id
+    key_vault_id                 = module.keyvault.key_vault_id
+    storage_account_id           = module.storage.storage_account_id
+    log_analytics_workspace_id   = module.monitor.log_analytics_workspace_id
   }
   sensitive = false
 }

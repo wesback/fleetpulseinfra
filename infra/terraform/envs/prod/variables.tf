@@ -32,18 +32,18 @@ variable "vnet_cidr" {
 variable "subnet_cidrs" {
   description = "CIDR blocks for subnets"
   type = object({
-    aca_infra             = string
-    gateway               = string
-    privatelink           = string
-    firewall              = string
-    dns_resolver_inbound  = string
+    aca_infra            = string
+    gateway              = string
+    privatelink          = string
+    firewall             = string
+    dns_resolver_inbound = string
   })
   default = {
-    aca_infra             = "10.20.0.0/27"   # 30 IPs
-    gateway               = "10.20.0.32/27"  # 30 IPs (GatewaySubnet)
-    privatelink           = "10.20.0.64/27"  # 30 IPs
-    firewall              = "10.20.0.96/27"  # 30 IPs (AzureFirewallSubnet)
-    dns_resolver_inbound  = "10.20.0.128/27" # 30 IPs
+    aca_infra            = "10.20.0.0/27"   # 30 IPs
+    gateway              = "10.20.0.32/27"  # 30 IPs (GatewaySubnet)
+    privatelink          = "10.20.0.64/27"  # 30 IPs
+    firewall             = "10.20.0.96/27"  # 30 IPs (AzureFirewallSubnet)
+    dns_resolver_inbound = "10.20.0.128/27" # 30 IPs
   }
 }
 
@@ -83,14 +83,14 @@ variable "vpn_shared_key" {
 variable "container_images" {
   description = "Container images for applications"
   type = object({
-    backend   = string
-    frontend  = string
-    otel      = string
+    backend  = string
+    frontend = string
+    otel     = string
   })
   default = {
-    backend   = "wesback/fleetpulse-backend:latest"
-    frontend  = "wesback/fleetpulse-frontend:latest"
-    otel      = "otel/opentelemetry-collector-contrib:0.91.0"
+    backend  = "wesback/fleetpulse-backend:latest"
+    frontend = "wesback/fleetpulse-frontend:latest"
+    otel     = "otel/opentelemetry-collector-contrib:0.91.0"
   }
 }
 
@@ -98,14 +98,14 @@ variable "container_images" {
 variable "custom_domains" {
   description = "Custom domains for applications"
   type = object({
-    backend   = string
-    frontend  = string
-    wildcard  = string
+    backend  = string
+    frontend = string
+    wildcard = string
   })
   default = {
-    backend   = "backend.backelant.eu"
-    frontend  = "frontend.backelant.eu"
-    wildcard  = "*.backelant.eu"
+    backend  = "backend.backelant.eu"
+    frontend = "frontend.backelant.eu"
+    wildcard = "*.backelant.eu"
   }
 }
 
@@ -113,16 +113,16 @@ variable "custom_domains" {
 variable "aca_workload_profile" {
   description = "ACA workload profile configuration"
   type = object({
-    name                    = string
-    workload_profile_type   = string
-    minimum_count          = number
-    maximum_count          = number
+    name                  = string
+    workload_profile_type = string
+    minimum_count         = number
+    maximum_count         = number
   })
   default = {
-    name                    = "Consumption"
-    workload_profile_type   = "Consumption"
-    minimum_count          = 0
-    maximum_count          = 10
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
+    minimum_count         = 0
+    maximum_count         = 10
   }
 }
 

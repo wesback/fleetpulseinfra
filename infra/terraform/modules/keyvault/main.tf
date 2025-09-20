@@ -26,7 +26,7 @@ resource "azurerm_key_vault" "main" {
   public_network_access_enabled = false
   
   # Use RBAC instead of access policies
-  enable_rbac_authorization = true
+  rbac_authorization_enabled = true
   
   tags = var.tags
 }

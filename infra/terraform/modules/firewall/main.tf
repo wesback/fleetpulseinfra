@@ -121,11 +121,10 @@ resource "azurerm_firewall" "main" {
 
 # Route Table for ACA subnet
 resource "azurerm_route_table" "aca" {
-  name                          = "${var.name_prefix}-rt-aca"
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  disable_bgp_route_propagation = false
-  tags                          = var.tags
+  name                = "${var.name_prefix}-rt-aca"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
 
   # Route all traffic through Azure Firewall
   route {
