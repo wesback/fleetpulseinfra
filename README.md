@@ -109,21 +109,21 @@ graph TB
     end
     
     %% Traffic Flows
-    HomeNet -.1. Internet Access.-> OPN
-    OPN -.2. IPsec Tunnel<br/>BGP: 65010.-> PIP
+    HomeNet -.->|Internet Access| OPN
+    OPN -.->|IPsec Tunnel BGP 65010| PIP
     PIP --> VPNGW
-    VPNGW -.3. Route: 10.20.0.0/24.-> VNET
+    VPNGW -.->|Route 10.20.0.0/24| VNET
     
-    ACAENV -.4. Internal Traffic.-> BE
-    ACAENV -.5. Internal Traffic.-> FE
-    BE -.6. Telemetry.-> OT
+    ACAENV -.->|Internal Traffic| BE
+    ACAENV -.->|Internal Traffic| FE
+    BE -.->|Telemetry| OT
     
-    BE -.7. Private DNS<br/>*.vault.azure.net.-> KVPE
-    BE -.8. Private DNS<br/>*.file.core.windows.net.-> STPE
-    BE -.9. Private DNS<br/>*.applicationinsights.azure.com.-> AIPE
+    BE -.->|Private DNS| KVPE
+    BE -.->|Private DNS| STPE
+    BE -.->|Private DNS| AIPE
     
-    HomeNet -.10. DNS Queries<br/>backelant.eu.-> DNSRES
-    DNSRES -.11. Conditional Forward.-> BE
+    HomeNet -.->|DNS Queries| DNSRES
+    DNSRES -.->|Conditional Forward| BE
     
     %% Security Boundaries
     subgraph Security["🔒 Security Features"]
@@ -182,12 +182,12 @@ graph TB
     end
     
     %% Visual connections showing subnet relationships
-    GW -.VPN Gateway Deployment.-> ACA
-    ACA -.Container Apps.-> PL
-    PL -.Service Dependencies.-> DNS
+    GW -.->|VPN Gateway Deployment| ACA
+    ACA -.->|Container Apps| PL
+    PL -.->|Service Dependencies| DNS
     
-    BGP -.Route Advertisement.-> GW
-    DNSFlow -.Conditional Forwarding.-> DNS
+    BGP -.->|Route Advertisement| GW
+    DNSFlow -.->|Conditional Forwarding| DNS
     
     %% Styling
     classDef subnet fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000
@@ -258,18 +258,18 @@ graph TB
     VNET --> MON
     VNET --> ENV
     
-    GW -.VPN Connectivity.-> ENV
+    GW -.->|VPN Connectivity| ENV
     KV --> MON
     MON --> ENV
     ENV --> APPS
     
-    KV -.Secrets.-> APPS
-    ST -.Persistent Storage.-> APPS
-    MON -.Telemetry.-> APPS
-    DNS -.Name Resolution.-> APPS
+    KV -.->|Secrets| APPS
+    ST -.->|Persistent Storage| APPS
+    MON -.->|Telemetry| APPS
+    DNS -.->|Name Resolution| APPS
     
-    POL -.Governance.-> ENV
-    FW -.Future Enhancement.-> ENV
+    POL -.->|Governance| ENV
+    FW -.->|Future Enhancement| ENV
     
     %% Styling
     classDef core fill:#1976d2,stroke:#ffffff,stroke-width:3px,color:#ffffff
