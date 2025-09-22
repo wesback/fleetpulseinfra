@@ -130,10 +130,7 @@ resource "azurerm_private_endpoint" "monitor" {
   private_dns_zone_group {
     name = "monitor-dns-zone-group"
     private_dns_zone_ids = [
-      azurerm_private_dns_zone.monitor.id,
-      azurerm_private_dns_zone.oms.id,
-      azurerm_private_dns_zone.ods.id,
-      azurerm_private_dns_zone.agentsvc.id
+      azurerm_private_dns_zone.monitor.id
     ]
   }
 }

@@ -321,6 +321,9 @@ Set these GitHub repository secrets:
 - `AZURE_SUBSCRIPTION_ID`
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
+- Additional CI / GitHub Actions secrets (do NOT commit these to the repo):
+  - `TF_VPN_SHARED_KEY` — VPN pre-shared key (sensitive)
+  - `TF_ON_PREM_GATEWAY_IP` — Public IP of your on-prem OPNsense gateway (sensitive)
 
 ### 2. Configure Terraform Variables
 
@@ -338,6 +341,27 @@ Update `terraform.tfvars` with your actual values:
 | `home_cidrs` | Trusted network CIDRs | `["192.168.0.0/24"]` |
 | `vpn_shared_key` | Strong PSK for VPN | `your-strong-psk-here` |
 | `custom_domains` | Your domain names | See example file |
+
+Important security notes
+- Do NOT commit real secrets (PSKs, private IPs, certificates) into the repo. The workflow is configured to accept sensitive values via GitHub Actions Secrets (see list above) and will inject them as `TF_VAR_*` at runtime so Terraform receives them without a checked-in `terraform.tfvars` containing secrets.
+- `container_images` are not treated as secrets — keep image names/tags in `terraform.tfvars` or override them via non-secret workflow inputs. Pin image tags for production.
+
+CI / GitHub Actions
+
+- The repository includes a `terraform-deploy` workflow that authenticates to Azure using OIDC and deploys the `prod` environment.
+- Workflow inputs (available when running the workflow manually via Actions → Terraform Deploy → Run workflow):
+  - `region` — optional; overrides the `location` Terraform variable for the run (sets `TF_VAR_location`).
+  - `custom_domains` — optional JSON string; overrides `custom_domains` (sets `TF_VAR_custom_domains`). Example value:
+
+  {"backend":"backend.example.com","frontend":"frontend.example.com","wildcard":"*.example.com"}
+
+- Recommended setup for production:
+  - Add `TF_VPN_SHARED_KEY` and `TF_ON_PREM_GATEWAY_IP` as environment-level secrets for the `production` environment in GitHub (not repo-level) and protect the environment with required approvers if appropriate.
+  - Do not echo secrets or commit them. The workflow validates required secrets before running Terraform and fails early if missing.
+
+How the workflow consumes values
+- Secrets such as `TF_VPN_SHARED_KEY` and `TF_ON_PREM_GATEWAY_IP` are passed into Terraform via `TF_VAR_*` environment variables so Terraform variables marked sensitive are supplied at runtime.
+- Non-secret overrides (region/custom_domains) can be provided using the workflow_dispatch inputs in the Actions UI; they are exported as `TF_VAR_location` and `TF_VAR_custom_domains` for the run.
 
 ### 3. Deploy Infrastructure
 

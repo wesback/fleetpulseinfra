@@ -35,7 +35,7 @@ resource "azurerm_storage_account" "main" {
 # Azure Files Share
 resource "azurerm_storage_share" "fleetpulse" {
   name                 = "fleetpulse"
-  storage_account_name = azurerm_storage_account.main.name
+  storage_account_id   = azurerm_storage_account.main.id
   quota                = 100 # GB
   
   depends_on = [azurerm_storage_account.main]

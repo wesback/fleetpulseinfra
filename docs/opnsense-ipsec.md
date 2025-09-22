@@ -8,84 +8,75 @@ This guide provides step-by-step instructions for configuring OPNsense to establ
 - Admin access to OPNsense web interface
 - Azure VPN Gateway deployed (from Terraform)
 - Pre-shared key (PSK) from `terraform.tfvars`
+- Important: treat the PSK and any public IPs as sensitive. Do NOT commit them to the repository. Store them in a secrets store (GitHub Actions Secrets, or Azure Key Vault) and inject them into CI (this repo's workflow injects `TF_VAR_vpn_shared_key`).
 
 ## Phase 1 (IKE) Configuration
 
-### 1. Navigate to VPN > IPsec > Tunnel Settings
+### 1. Navigate to VPN > IPsec > Connections
 
-Create a new Phase 1 configuration with these settings:
+1. Go to **VPN → IPsec → Connections**
+2. Click the **[+]** button to add a new connection
+3. Configure the General settings as shown below
+
+Create a new connection with these **General settings**:
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| **Connection Method** | Start on traffic | |
-| **Key Exchange Version** | IKEv2 | Azure VPN Gateway requirement |
-| **Internet Protocol** | IPv4 | |
-| **Interface** | WAN | Your internet-facing interface |
-| **Remote Gateway** | `<AZURE_VPN_GATEWAY_IP>` | From Terraform output |
+| **enabled** | ✓ (checked) | Enable the connection |
+| **Proposals** | default | Use default proposal set |
+| **Version** | IKEv1+IKEv2 | Azure VPN Gateway supports both |
+| **MOBIKE** | ✓ (checked) | Enable mobility and multihoming |
+| **Local addresses** | (leave empty) | Auto-detect WAN interface |
+| **Remote addresses** | `<AZURE_VPN_GATEWAY_IP>` | From Terraform output |
+| **DPD delay (s)** | 10 | Dead Peer Detection interval |
+| **Pools** | Nothing selected | Not needed for site-to-site |
 | **Description** | Azure FleetPulse VPN | |
 
-### 2. Phase 1 Proposal (Authentication)
+### 2. Configure Authentication and Child SAs
 
+After saving the General settings above, you'll need to configure:
+
+1. **Local Authentication** - Click on the connection entry to edit it further
+2. **Remote Authentication** - Set the pre-shared key
+3. **Child SAs** - Configure the traffic selectors (equivalent to Phase 2)
+
+**Authentication Settings:**
+- **Authentication Method**: Pre-shared Key (PSK)
+- **Pre-Shared Key**: `<YOUR_PSK>` (Sensitive — retrieve from secret store, do not paste into source files)
+- **Local/Remote Identifiers**: Use IP addresses for static IPs, or FQDN/Distinguished Name for dynamic IPs
+
+**Important Notes:**
+- The "Proposals" dropdown uses predefined algorithm sets. The "default" proposal includes AES-256, SHA256, and appropriate DH groups that are compatible with Azure VPN Gateway.
+- If your OPNsense public IP is dynamic or behind NAT, enable MOBIKE and use appropriate identifier types (FQDN or defined Peer ID) rather than IP addresses.
+- AES-GCM (authenticated encryption) is included in modern proposal sets when both peers support it.
+
+NAT and Identifier guidance
+
+- If your OPNsense public IP is dynamic or behind NAT, do not rely solely on IP address identifiers. Use appropriate Identifier types (FQDN or defined Peer ID) and enable NAT-Traversal (NAT-T). Mismatched identifiers are a common cause of silent authentication failures.
+
+## Child SA (Traffic Selectors) Configuration
+
+### 1. Configure Child SAs for Traffic Routing
+
+In the connection entry, you need to define Child SAs (Security Associations) that specify which traffic should use the VPN:
+
+1. Click on your connection entry to edit it
+2. Look for "Children" or "Child SAs" section
+3. Add a new child SA with these settings:
+
+**Child SA Settings:**
 | Setting | Value | Notes |
 |---------|-------|-------|
-| **Authentication Method** | Mutual PSK | |
-| **My Identifier** | My IP Address | |
-| **Peer Identifier** | Peer IP Address | |
-| **Pre-Shared Key** | `<YOUR_PSK>` | From terraform.tfvars |
+| **Local Traffic Selector** | `192.168.0.0/24` | Your on-premises network CIDR |
+| **Remote Traffic Selector** | `10.20.0.0/24` | Azure VNET CIDR from terraform.tfvars |
+| **Mode** | Tunnel | Standard for site-to-site VPN |
+| **Protocol** | ESP | Encapsulating Security Payload |
 
-### 3. Phase 1 Proposal (Algorithms)
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Encryption Algorithm** | AES 256 | |
-| **Hash Algorithm** | SHA256 | |
-| **DH Group** | 14 (2048 bit) | |
-| **Lifetime** | 28800 | 8 hours (Azure default) |
-
-### 4. Advanced Options
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Dead Peer Detection** | Enabled | |
-| **DPD Delay** | 10 | seconds |
-| **DPD Max Failures** | 5 | |
-
-## Phase 2 (IPsec) Configuration
-
-### 1. Create Phase 2 Entry
-
-Click "Show Phase 2 Entries" and add a new entry:
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Mode** | Tunnel IPv4 | |
-| **Description** | Azure FleetPulse Traffic | |
-
-### 2. Local Network
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Local Network** | Network | |
-| **Address** | `192.168.0.0` | Your on-premises network |
-| **Netmask** | `24` | Adjust as needed |
-
-### 3. Remote Network
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Remote Network** | Network | |
-| **Address** | `10.20.0.0` | Azure VNET CIDR |
-| **Netmask** | `24` | From terraform.tfvars |
-
-### 4. Phase 2 Proposal (Algorithms)
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Protocol** | ESP | |
-| **Encryption Algorithms** | AES 256 | |
-| **Hash Algorithms** | SHA256 | |
-| **PFS Group** | 14 (2048 bit) | Perfect Forward Secrecy |
-| **Lifetime** | 27000 | seconds (7.5 hours) |
+**Important Notes:**
+- Azure VPN Gateways are route-based. The traffic selectors define which networks can communicate over the VPN.
+- Local traffic selector = your on-premises network (behind OPNsense)
+- Remote traffic selector = Azure VNET CIDR (must match exactly what's configured in Terraform)
+- The connection will use the default ESP proposals which include AES-256, SHA256, and appropriate PFS groups
 
 ## Firewall Rules Configuration
 
@@ -192,6 +183,34 @@ Navigate to **VPN > IPsec > Status Overview**:
 
 - Phase 1 should show "ESTABLISHED"
 - Phase 2 should show "INSTALLED"
+
+Quick CLI checks (useful when the UI is unavailable or for automation):
+
+```bash
+# Show status summary
+configctl ipsec status
+
+# Show full strongSwan status
+ipsec statusall
+
+# Show SAs and lifetimes
+ipsec listall
+```
+
+Quick verification checklist:
+
+- Phase1 state: ESTABLISHED
+- Phase2 state: INSTALLED
+- Correct SA lifetimes and matching proposals
+- Ping an Azure VNET address (e.g. 10.20.0.4) from on‑prem
+- Verify DNS resolution if DNS forwarding is configured
+
+Troubleshooting: Can't find the IPsec Connections page?
+
+- Ensure you are logged in as an admin user — non‑privileged accounts may hide menu items.
+- Use the UI sidebar search (type "IPsec" or "VPN") to jump directly to the IPsec page.
+- The correct path is VPN → IPsec → **Connections** (this is the standard location in modern OPNsense versions).
+- If the page is blank or controls are greyed out, clear your browser cache or try a different browser and confirm the ipsec service is running (see CLI checks above).
 
 ### 2. Test Connectivity
 
@@ -325,12 +344,3 @@ configctl ipsec reload
 - [OPNsense IPsec Documentation](https://docs.opnsense.org/manual/ipsec.html)
 - [Azure VPN Gateway Documentation](https://docs.microsoft.com/en-us/azure/vpn-gateway/)
 - Community support: OPNsense Forum and Reddit
-
-## Maintenance Schedule
-
-Recommended maintenance tasks:
-
-- **Weekly**: Check VPN status and logs
-- **Monthly**: Review firewall rules and logs
-- **Quarterly**: Update PSK and test failover
-- **Annually**: Full configuration review and documentation update

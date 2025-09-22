@@ -12,6 +12,15 @@ on:
       - 'infra/terraform/**'
       - '.github/workflows/terraform-deploy.yml'
   workflow_dispatch:
+    inputs:
+      region:
+        description: 'Optional: override the Azure region for this run'
+        required: false
+        default: ''
+      custom_domains:
+        description: 'Optional: JSON map for custom_domains, e.g. {"backend":"a","frontend":"b","wildcard":"*.example.com"}'
+        required: false
+        default: ''
 
 env:
   TF_VERSION: "1.6.0"
@@ -47,6 +56,36 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
 
+    - name: Prepare Terraform variables (validate required secrets)
+      working-directory: ./infra/terraform/envs/prod
+      run: |
+        # Fail early if required secrets are missing
+        if [ -z "${TF_VAR_vpn_shared_key:-}" ]; then
+          echo "Missing required secret: TF_VAR_vpn_shared_key" >&2
+          exit 1
+        fi
+        if [ -z "${TF_VAR_on_premises_gateway_ip:-}" ]; then
+          echo "Missing required secret: TF_VAR_on_premises_gateway_ip" >&2
+          exit 1
+        fi
+
+        # If workflow inputs were provided, export them as TF_VAR_* so Terraform picks them up
+        if [ -n "${INPUT_REGION:-}" ]; then
+          echo "Setting TF_VAR_location from workflow input"
+          echo "TF_VAR_location=${INPUT_REGION}" >> $GITHUB_ENV
+        fi
+        if [ -n "${INPUT_CUSTOM_DOMAINS:-}" ]; then
+          echo "Setting TF_VAR_custom_domains from workflow input"
+          echo "TF_VAR_custom_domains=${INPUT_CUSTOM_DOMAINS}" >> $GITHUB_ENV
+        fi
+
+        # We do not print or log secrets here. They are provided via env and masked by Actions.
+      env:
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
+        INPUT_REGION: ${{ github.event.inputs.region }}
+        INPUT_CUSTOM_DOMAINS: ${{ github.event.inputs.custom_domains }}
+
     - name: Terraform Format Check
       working-directory: ./infra/terraform/envs/prod
       run: terraform fmt -check -recursive
@@ -58,6 +97,8 @@ jobs:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
 
     - name: Terraform Validate
       working-directory: ./infra/terraform/envs/prod
@@ -70,6 +111,8 @@ jobs:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -79,6 +122,8 @@ jobs:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
 
     - name: Terraform Output
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -92,6 +137,8 @@ jobs:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
 
     # Save outputs for post-deploy job
     - name: Save Terraform Outputs
@@ -106,6 +153,8 @@ jobs:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vpn_shared_key: ${{ secrets.TF_VPN_SHARED_KEY }}
+        TF_VAR_on_premises_gateway_ip: ${{ secrets.TF_ON_PREM_GATEWAY_IP }}
 
     - name: Upload Terraform Outputs
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'

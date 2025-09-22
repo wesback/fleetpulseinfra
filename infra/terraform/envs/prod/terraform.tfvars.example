@@ -3,7 +3,7 @@
 
 # Basic Configuration
 resource_group_name = "rg-fleetpulse-prod"
-location           = "West Europe"
+location           = "West Europe"  # Can be overridden in CI via the workflow_dispatch `region` input (sets TF_VAR_location)
 environment        = "prod"
 project_name       = "fleetpulse"
 
@@ -25,7 +25,7 @@ home_cidrs = [
 
 # VPN Configuration - Update with your OPNsense details
 vpn_gateway_sku          = "VpnGw1"
-on_premises_gateway_ip   = "203.0.113.1"  # TODO: Replace with OPNsense public IP
+on_premises_gateway_ip   = "REPLACE_WITH_YOUR_PUBLIC_IP"  # DO NOT commit this value. Store the real IP in a GitHub Secret (e.g. TF_ON_PREM_GATEWAY_IP) and inject via TF_VAR_on_premises_gateway_ip in CI.
 on_premises_networks     = [
   "192.168.0.0/24"       # TODO: Replace with actual on-premises networks
 ]
@@ -39,6 +39,9 @@ container_images = {
 }
 
 # Custom Domains - Update with your actual domains
+# These values can be overridden by CI when invoking the workflow (workflow_dispatch input `custom_domains`) by passing
+# a JSON map, for example:
+# {"backend":"backend.example.com","frontend":"frontend.example.com","wildcard":"*.example.com"}
 custom_domains = {
   backend   = "backend.backelant.eu"     # TODO: Update domain
   frontend  = "frontend.backelant.eu"    # TODO: Update domain
