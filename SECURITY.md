@@ -39,9 +39,12 @@ The FleetPulse Azure infrastructure implements defense-in-depth security:
 
 #### Network Security
 - **Private Networking**: All applications run on private networks with no public exposure
-- **VPN Access**: Site-to-Site VPN required for all access from on-premises
-- **Firewall Protection**: Azure Firewall controls all egress traffic with allow-list rules
-- **Network Segmentation**: Separate subnets for different components with appropriate routing
+- **VPN Access**: Site-to-Site VPN required for all access from on-premises  
+- **Internal Load Balancer**: Container Apps use internal-only networking
+- **IP Restrictions**: Application-level access controls for trusted networks
+- **Network Segmentation**: Separate subnets for different components
+
+> **Note**: Azure Firewall was removed for cost optimization in this simple web app deployment. For expanded scope or stricter security requirements, consider adding Azure Firewall for centralized egress traffic control.
 
 #### Identity and Access Management
 - **Managed Identity**: All Azure service-to-service authentication uses managed identities

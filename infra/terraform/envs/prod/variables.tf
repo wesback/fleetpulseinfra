@@ -35,14 +35,14 @@ variable "subnet_cidrs" {
     aca_infra            = string
     gateway              = string
     privatelink          = string
-    firewall             = string
+    # firewall             = string  # Removed for cost optimization
     dns_resolver_inbound = string
   })
   default = {
     aca_infra            = "10.20.0.0/27"   # 30 IPs
     gateway              = "10.20.0.32/27"  # 30 IPs (GatewaySubnet)
     privatelink          = "10.20.0.64/27"  # 30 IPs
-    firewall             = "10.20.0.96/27"  # 30 IPs (AzureFirewallSubnet)
+    # firewall             = "10.20.0.96/27"  # 30 IPs (Reserved for future firewall)
     dns_resolver_inbound = "10.20.0.128/27" # 30 IPs
   }
 }

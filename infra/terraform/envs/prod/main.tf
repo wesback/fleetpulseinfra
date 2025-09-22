@@ -46,19 +46,10 @@ module "gateway" {
   tags                   = local.common_tags
 }
 
-# Azure Firewall with UDR for egress control
-module "firewall" {
-  source = "../../modules/firewall"
-
-  resource_group_name  = azurerm_resource_group.main.name
-  location             = azurerm_resource_group.main.location
-  name_prefix          = local.name_prefix
-  vnet_name            = module.vnet.vnet_name
-  firewall_subnet_id   = module.vnet.firewall_subnet_id
-  aca_subnet_id        = module.vnet.aca_subnet_id
-  on_premises_networks = var.on_premises_networks
-  tags                 = local.common_tags
-}
+# Note: Azure Firewall removed for cost optimization
+# For larger deployments or stricter security requirements, consider adding:
+# - Azure Firewall for egress traffic control
+# - User Defined Routes (UDR) for traffic routing
 
 # DNS Private Resolver for on-premises conditional forwarding
 module "dns_resolver" {
@@ -130,7 +121,7 @@ module "aca_env" {
   custom_domains             = var.custom_domains
   tags                       = local.common_tags
 
-  depends_on = [module.firewall] # Ensure UDR is in place
+  # No firewall dependency needed for simple web app deployment
 }
 
 # Container Apps (backend, frontend, otel-collector)

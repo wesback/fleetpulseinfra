@@ -4,40 +4,287 @@ This repository contains production-grade infrastructure code to migrate FleetPu
 
 ## 🏗️ Architecture Overview
 
+## 🏗️ Architecture Overview
+
+### High-Level Architecture
+
+```mermaid
+graph TB
+    Internet((Internet))
+    OnPrem[🏢 On-premises<br/>OPNsense Router]
+    
+    subgraph Azure["☁️ Azure Cloud"]
+        VPNGw[🔒 VPN Gateway<br/>Site-to-Site]
+        
+        subgraph VNET["🌐 Virtual Network (10.20.0.0/24)"]
+            subgraph Subnets["Subnets"]
+                ACASubnet[📦 Container Apps<br/>snet-aca-infra]
+                GWSubnet[🚪 Gateway<br/>GatewaySubnet]
+                PLSubnet[🔗 Private Link<br/>snet-privatelink]
+                DNSSubnet[🌍 DNS Resolver<br/>snet-dnsresolver]
+            end
+            
+            subgraph ACA["🚀 Container Apps Environment"]
+                Backend[⚙️ Backend API<br/>Node.js]
+                Frontend[🖥️ Frontend<br/>React]
+                OTEL[📊 OTEL Collector<br/>Observability]
+            end
+            
+            subgraph Services["🔧 Azure Services"]
+                KV[🔐 Key Vault<br/>Secrets & Certs]
+                Storage[💾 Azure Files<br/>Persistent Storage]
+                Monitor[📈 App Insights<br/>Monitoring]
+                DNS[🌍 DNS Resolver<br/>Conditional Forwarding]
+            end
+        end
+    end
+    
+    %% Connections
+    Internet -.-> OnPrem
+    OnPrem -.IPsec Tunnel.-> VPNGw
+    VPNGw --> VNET
+    
+    ACA -.Internal LB.-> Backend
+    ACA -.Internal LB.-> Frontend
+    ACA --> OTEL
+    
+    Backend -.Private Endpoints.-> KV
+    Backend -.Private Endpoints.-> Storage
+    Backend -.Private Endpoints.-> Monitor
+    
+    OnPrem -.DNS Queries.-> DNS
+    
+    %% Styling
+    classDef azure fill:#0078d4,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef onprem fill:#ff6b35,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef apps fill:#00bcf2,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef services fill:#7fba00,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    class Azure,VNET azure
+    class OnPrem onprem
+    class Backend,Frontend,OTEL apps
+    class KV,Storage,Monitor,DNS services
 ```
-                    Internet
-                       │
-                  ┌────┴────┐
-                  │ OPNsense │ (On-premises)
-                  │ Router   │
-                  └────┬────┘
-                       │ Site-to-Site VPN
-                       │
-              ┌────────┴────────┐
-              │ Azure VPN Gateway│
-              └────────┬────────┘
-                       │
-          ┌────────────┴────────────┐
-          │      Azure VNET         │
-          │   (10.20.0.0/24)       │
-          ├─────────────────────────┤
-          │ Azure Firewall + UDR    │ ← Egress Control
-          ├─────────────────────────┤
-          │ Container Apps Env      │
-          │ (Internal Load Balancer)│
-          │                         │
-          │ ┌─────┐ ┌─────┐ ┌─────┐ │
-          │ │Back │ │Front│ │OTEL │ │
-          │ │end  │ │end  │ │Coll │ │
-          │ └─────┘ └─────┘ └─────┘ │
-          └─────────────────────────┘
-                       │
-          ┌─────────────────────────┐
-          │ Private Endpoints       │
-          │ • Key Vault            │
-          │ • Azure Files          │
-          │ • Application Insights │
-          └─────────────────────────┘
+
+### Network Topology & Traffic Flow
+
+```mermaid
+graph TB
+    subgraph OnPremises["🏢 On-premises Network"]
+        HomeNet[Home Network<br/>192.168.1.0/24]
+        OPN[OPNsense Router<br/>Public IP]
+    end
+    
+    subgraph Azure["☁️ Azure West Europe"]
+        PIP[📡 Public IP<br/>VPN Gateway]
+        
+        subgraph RG["📋 Resource Group: rg-fleetpulse-prod"]
+            subgraph VNET["🌐 vnet-fleetpulse-prod (10.20.0.0/24)"]
+                
+                subgraph ACASub["📦 snet-aca-infra (10.20.0.0/27)"]
+                    ACAENV[🚀 Container Apps Environment<br/>Internal Load Balancer Only]
+                    
+                    subgraph Apps["Applications"]
+                        BE[⚙️ Backend<br/>backend.backelant.eu:8000]
+                        FE[🖥️ Frontend<br/>frontend.backelant.eu:443]
+                        OT[📊 OTEL Collector<br/>:4317]
+                    end
+                end
+                
+                subgraph GWSub["🚪 GatewaySubnet (10.20.0.32/27)"]
+                    VPNGW[🔒 VPN Gateway<br/>VpnGw1 SKU]
+                end
+                
+                subgraph PLSub["🔗 snet-privatelink (10.20.0.64/27)"]
+                    KVPE[🔐 Key Vault PE]
+                    STPE[💾 Storage PE]
+                    AIPE[📈 App Insights PE]
+                end
+                
+                subgraph DNSSub["🌍 snet-dnsresolver-inbound (10.20.0.128/27)"]
+                    DNSRES[🌍 DNS Private Resolver<br/>Conditional Forwarding]
+                end
+            end
+        end
+    end
+    
+    %% Traffic Flows
+    HomeNet -.1. Internet Access.-> OPN
+    OPN -.2. IPsec Tunnel<br/>BGP: 65010.-> PIP
+    PIP --> VPNGW
+    VPNGW -.3. Route: 10.20.0.0/24.-> VNET
+    
+    ACAENV -.4. Internal Traffic.-> BE
+    ACAENV -.5. Internal Traffic.-> FE
+    BE -.6. Telemetry.-> OT
+    
+    BE -.7. Private DNS<br/>*.vault.azure.net.-> KVPE
+    BE -.8. Private DNS<br/>*.file.core.windows.net.-> STPE
+    BE -.9. Private DNS<br/>*.applicationinsights.azure.com.-> AIPE
+    
+    HomeNet -.10. DNS Queries<br/>backelant.eu.-> DNSRES
+    DNSRES -.11. Conditional Forward.-> BE
+    
+    %% Security Boundaries
+    subgraph Security["🔒 Security Features"]
+        direction LR
+        NSG[🛡️ Network Security Groups]
+        PE[🔗 Private Endpoints Only]
+        VPN[🔒 VPN-Only Access]
+        TLS[🔐 TLS/mTLS Encryption]
+    end
+    
+    %% Styling
+    classDef onprem fill:#ff6b35,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef azure fill:#0078d4,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef network fill:#00bcf2,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef apps fill:#7fba00,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef security fill:#e74c3c,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    class OnPremises,HomeNet,OPN onprem
+    class Azure,RG azure
+    class VNET,GWSub,ACASub,PLSub,DNSSub network
+    class BE,FE,OT,ACAENV apps
+    class Security,NSG,PE,VPN,TLS security
+```
+
+### 🔧 Network Configuration Details
+
+```mermaid
+graph TB
+    subgraph Legend["📋 IP Allocation & Subnets"]
+        subgraph VNET["🌐 Virtual Network: 10.20.0.0/24 (256 IPs)"]
+            
+            subgraph Subnets["Subnet Breakdown"]
+                ACA["� snet-aca-infra<br/>10.20.0.0/27<br/>(30 usable IPs)<br/>Container Apps Environment"]
+                
+                GW["� GatewaySubnet<br/>10.20.0.32/27<br/>(30 usable IPs)<br/>VPN Gateway infrastructure"]
+                
+                PL["🔗 snet-privatelink<br/>10.20.0.64/27<br/>(30 usable IPs)<br/>Private Endpoints"]
+                
+                DNS["🌍 snet-dnsresolver-inbound<br/>10.20.0.128/27<br/>(30 usable IPs)<br/>DNS Private Resolver"]
+                
+                Reserved["🚫 Reserved Space<br/>10.20.0.96/27 + 10.20.0.160/27<br/>(60 IPs available)<br/>Future expansion (Firewall)"]
+            end
+        end
+        
+        subgraph OnPrem["🏢 On-premises Networks"]
+            Home["🏠 Home Network<br/>192.168.1.0/24<br/>Allowed source IPs"]
+            
+            Office["🏢 Office Network<br/>10.0.0.0/24<br/>Additional allowed range"]
+        end
+        
+        subgraph Routes["🛣️ Routing & DNS"]
+            BGP["📡 BGP Configuration<br/>Local ASN: 65515<br/>Remote ASN: 65010<br/>Auto route propagation"]
+            
+            DNSFlow["🌍 DNS Resolution Flow<br/>1. Query: backend.backelant.eu<br/>2. Technitium → DNS Resolver<br/>3. Resolver → Internal LB<br/>4. Response: 10.20.0.x"]
+        end
+    end
+    
+    %% Visual connections showing subnet relationships
+    GW -.VPN Gateway Deployment.-> ACA
+    ACA -.Container Apps.-> PL
+    PL -.Service Dependencies.-> DNS
+    
+    BGP -.Route Advertisement.-> GW
+    DNSFlow -.Conditional Forwarding.-> DNS
+    
+    %% Styling
+    classDef subnet fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000
+    classDef onprem fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
+    classDef routing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000
+    classDef reserved fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000000
+    
+    class GW,ACA,PL,DNS subnet
+    class Home,Office onprem
+    class BGP,DNSFlow routing
+    class Reserved reserved
+```
+
+### 🔒 Security & Access Control
+
+| Component | Access Method | Source Networks | Ports | Protocol |
+|-----------|---------------|-----------------|--------|----------|
+| **Frontend** | Internal LB only | VPN networks | 443 | HTTPS |
+| **Backend API** | Internal LB only | VPN networks | 8000 | HTTPS |
+| **OTEL Collector** | Internal only | Container Apps | 4317, 4318 | gRPC/HTTP |
+| **Key Vault** | Private Endpoint | Container Apps | 443 | HTTPS |
+| **Azure Files** | Private Endpoint | Container Apps | 445 | SMB 3.0 |
+| **App Insights** | Private Endpoint | Container Apps | 443 | HTTPS |
+
+### 📊 Traffic Flow Summary
+
+1. **Inbound**: On-premises → VPN → Internal Load Balancer → Container Apps
+2. **Service-to-Service**: Apps → Private Endpoints (Key Vault, Storage, Monitoring)
+3. **DNS**: On-premises DNS → Conditional forwarding → Azure DNS Resolver → Internal resolution
+4. **Outbound**: Container Apps → Azure services via private endpoints (no internet egress)
+
+### 🧩 Terraform Module Dependencies
+
+```mermaid
+graph TB
+    subgraph Core["🏗️ Core Infrastructure"]
+        RG[📋 Resource Group<br/>rg-fleetpulse-prod]
+        VNET[🌐 VNet Module<br/>Network Foundation]
+    end
+    
+    subgraph Network["🌐 Networking Modules"]
+        GW[🚪 Gateway Module<br/>VPN Site-to-Site]
+        DNS[🌍 DNS Resolver<br/>Conditional Forwarding]
+        FW[🔥 Firewall Module<br/>⚠️ Currently Disabled]
+    end
+    
+    subgraph Security["🔒 Security & Storage"]
+        KV[🔐 KeyVault Module<br/>Secrets & Certificates]
+        ST[💾 Storage Module<br/>Azure Files]
+        POL[📜 Policy Module<br/>Security Policies]
+    end
+    
+    subgraph Platform["🚀 Platform Services"]
+        MON[📈 Monitor Module<br/>App Insights + AMPLS]
+        ENV[📦 ACA Environment<br/>Container Platform]
+    end
+    
+    subgraph Applications["⚙️ Applications"]
+        APPS[🚀 Apps Module<br/>Backend + Frontend + OTEL]
+    end
+    
+    %% Dependencies Flow
+    RG --> VNET
+    VNET --> GW
+    VNET --> DNS
+    VNET --> KV
+    VNET --> ST
+    VNET --> MON
+    VNET --> ENV
+    
+    GW -.VPN Connectivity.-> ENV
+    KV --> MON
+    MON --> ENV
+    ENV --> APPS
+    
+    KV -.Secrets.-> APPS
+    ST -.Persistent Storage.-> APPS
+    MON -.Telemetry.-> APPS
+    DNS -.Name Resolution.-> APPS
+    
+    POL -.Governance.-> ENV
+    FW -.Future Enhancement.-> ENV
+    
+    %% Styling
+    classDef core fill:#1976d2,stroke:#ffffff,stroke-width:3px,color:#ffffff
+    classDef network fill:#0288d1,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef security fill:#7b1fa2,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef platform fill:#388e3c,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef apps fill:#f57c00,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    classDef disabled fill:#9e9e9e,stroke:#ffffff,stroke-width:2px,color:#ffffff
+    
+    class RG,VNET core
+    class GW,DNS network
+    class KV,ST,POL security
+    class MON,ENV platform
+    class APPS apps
+    class FW disabled
 ```
 
 ## 🚀 Quick Start
@@ -139,7 +386,7 @@ curl -k https://frontend.backelant.eu
 │   └── modules/                # Reusable modules
 │       ├── vnet/               # Virtual network
 │       ├── gateway/            # VPN gateway
-│       ├── firewall/           # Azure Firewall + UDR
+│       ├── firewall/           # Azure Firewall (unused - for future expansion)
 │       ├── dns_resolver/       # DNS Private Resolver
 │       ├── storage/            # Azure Files
 │       ├── keyvault/           # Key Vault
@@ -158,8 +405,8 @@ curl -k https://frontend.backelant.eu
 
 ### Network Security
 - **Private Container Apps** with internal load balancer only
-- **Azure Firewall** controls all egress traffic
-- **IP restrictions** limit access to trusted networks
+- **Private networking** with no public endpoints
+- **IP restrictions** limit access to trusted networks  
 - **Site-to-Site VPN** provides secure connectivity
 
 ### Identity & Access
@@ -240,17 +487,18 @@ Estimated monthly costs (West Europe):
 |---------|---------------|-----------|
 | Container Apps | 3 apps, avg load | €50-100 |
 | VPN Gateway | VpnGw1 | €25 |
-| Azure Firewall | Standard | €100 |
 | Storage | 100GB Files | €5 |
 | Key Vault | Standard | €5 |
 | App Insights | 1GB/month | €10 |
-| **Total** | | **€195-245** |
+| **Total** | | **€95-145** |
+
+> **Note**: Azure Firewall (€100/month) was removed for cost optimization. For larger deployments or stricter security requirements, consider adding Azure Firewall for egress traffic control.
 
 Cost optimization tips:
 - Use Consumption workload profile for variable loads
 - Scale down non-production hours
 - Monitor with cost alerts
-- Review firewall rules regularly
+- Consider Azure Firewall for expanded scope
 
 ## 🛠️ Development Workflow
 

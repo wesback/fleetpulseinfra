@@ -13,7 +13,7 @@ subnet_cidrs = {
   aca_infra             = "10.20.0.0/27"
   gateway               = "10.20.0.32/27"
   privatelink           = "10.20.0.64/27"
-  firewall              = "10.20.0.96/27"
+  # firewall              = "10.20.0.96/27"  # Reserved for future use
   dns_resolver_inbound  = "10.20.0.128/27"
 }
 

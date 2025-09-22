@@ -72,20 +72,16 @@ The solution provides:
 │  └────────────────────────────────────────────────────┘         │
 │                                                                │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │           Azure Firewall Subnet                         │   │
-│  │           (10.20.0.96/27)                              │   │
-│  │  ┌─────────────────────────────────────────────────┐    │   │
-│  │  │            Azure Firewall                      │    │   │
-│  │  │            (Standard SKU)                      │    │   │
-│  │  │                                               │    │   │
-│  │  │  • Allow Docker Hub                          │    │   │
-│  │  │  • Allow Azure Services                      │    │   │
-│  │  │  • Block everything else                     │    │   │
-│  │  └─────────────────────────────────────────────────┘    │   │
+│  │           Reserved Network Space                        │   │
+│  │           (10.20.0.96/27 - Available for Future)      │   │
+│  │                                                        │   │
+│  │  Note: Azure Firewall removed for cost optimization   │   │
+│  │  Consider adding for larger deployments:               │   │
+│  │  • Egress traffic control                             │   │
+│  │  • Advanced threat protection                         │   │
+│  │  • Centralized logging                                │   │
 │  └──────────────────────────────────────────────────────────┘   │
-│                             │                                   │
-│                             │ User Defined Route                │
-│                             ▼                                   │
+│                                                                │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │        Container Apps Infrastructure Subnet             │   │
 │  │        (10.20.0.0/27)                                  │   │
@@ -133,9 +129,9 @@ The solution provides:
 
 1. **Network Layer**
    - Private Container Apps (no public endpoints)
-   - Azure Firewall with allow-list rules
+   - Private networking with internal load balancer
    - VPN-only connectivity from on-premises
-   - Network Security Groups and UDRs
+   - IP restrictions on application ingress
 
 2. **Identity Layer**
    - Managed Identity for all service-to-service auth

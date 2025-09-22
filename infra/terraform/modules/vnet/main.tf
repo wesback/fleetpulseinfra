@@ -45,13 +45,8 @@ resource "azurerm_subnet" "privatelink" {
   address_prefixes     = [var.subnet_cidrs.privatelink]
 }
 
-# Azure Firewall Subnet (must be named exactly "AzureFirewallSubnet")
-resource "azurerm_subnet" "firewall" {
-  name                 = "AzureFirewallSubnet"
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = [var.subnet_cidrs.firewall]
-}
+# Azure Firewall subnet removed for cost optimization
+# Uncomment and add firewall module if stricter egress control is needed
 
 # DNS Resolver Inbound Subnet
 resource "azurerm_subnet" "dns_resolver_inbound" {

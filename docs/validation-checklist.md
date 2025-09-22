@@ -198,17 +198,20 @@ curl -k https://frontend.backelant.eu/favicon.ico
 curl -k https://backend.backelant.eu:8000/health --connect-timeout 10
 # Expected: Connection timeout or DNS resolution failure
 
-# Test firewall rules
+# Test network isolation
 nmap -p 443,80,8000 backend.backelant.eu
 # Expected: Ports should be filtered/closed from external networks
 ```
 
 **Checklist:**
 - [ ] Applications are NOT accessible from public internet
-- [ ] Applications are only accessible from trusted networks
-- [ ] IP restrictions are working correctly
+- [ ] Applications are only accessible from trusted networks via VPN
+- [ ] IP restrictions are working correctly at application level
+- [ ] Container Apps use internal load balancer only
 - [ ] Azure Policy prevents external network access
-- [ ] VPN is required for access
+- [ ] VPN is required for all access
+
+> **Note**: Azure Firewall was removed for cost optimization. Network security relies on private networking, VPN-only access, and application-level IP restrictions.
 
 ### 4.2 Key Vault Security
 

@@ -23,10 +23,11 @@ output "privatelink_subnet_id" {
   value       = azurerm_subnet.privatelink.id
 }
 
-output "firewall_subnet_id" {
-  description = "ID of the Azure Firewall subnet"
-  value       = azurerm_subnet.firewall.id
-}
+# Firewall subnet output removed - add back if firewall is re-enabled
+# output "firewall_subnet_id" {
+#   description = "ID of the Azure Firewall subnet"
+#   value       = azurerm_subnet.firewall.id
+# }
 
 output "dns_resolver_inbound_subnet_id" {
   description = "ID of the DNS Resolver inbound subnet"

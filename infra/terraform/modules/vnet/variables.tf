@@ -24,7 +24,7 @@ variable "subnet_cidrs" {
     aca_infra             = string
     gateway               = string
     privatelink           = string
-    firewall              = string
+    # firewall              = string  # Removed for cost optimization
     dns_resolver_inbound  = string
   })
 }
