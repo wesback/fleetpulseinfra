@@ -1,0 +1,18 @@
+# FleetPulse Production Shared Layer Configuration
+# Copy this file to terraform.tfvars and update with actual values
+
+environment  = "prod"
+project_name = "fleetpulse"
+
+# Backend configuration for remote state
+backend_rg        = "rg-terraform-state-prod"
+backend_sa        = "stterraformstateprod"
+backend_container = "tfstate"
+
+# Tags
+tags = {
+  Environment = "prod"
+  Project     = "fleetpulse"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+}

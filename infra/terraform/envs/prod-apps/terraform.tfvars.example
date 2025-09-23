@@ -1,0 +1,51 @@
+# FleetPulse Production Apps Layer Configuration
+# Copy this file to terraform.tfvars and update with actual values
+
+environment  = "prod"
+project_name = "fleetpulse"
+
+# Backend configuration for remote state
+backend_rg        = "rg-terraform-state-prod"
+backend_sa        = "stterraformstateprod"
+backend_container = "tfstate"
+
+# Container Images
+container_images = {
+  backend  = "wesback/fleetpulse-backend:latest"
+  frontend = "wesback/fleetpulse-frontend:latest"
+  otel     = "otel/opentelemetry-collector-contrib:0.91.0"
+}
+
+# Custom Domains
+custom_domains = {
+  backend  = "backend.backelant.eu"
+  frontend = "frontend.backelant.eu"
+  wildcard = "*.backelant.eu"
+}
+
+# Network Configuration
+home_cidrs = ["192.168.0.0/24"] # TODO: Replace with actual home network CIDRs
+
+# Resource Configuration
+app_resources = {
+  backend = {
+    cpu    = 0.5
+    memory = "1Gi"
+  }
+  frontend = {
+    cpu    = 0.25
+    memory = "0.5Gi"
+  }
+  otel = {
+    cpu    = 0.25
+    memory = "0.5Gi"
+  }
+}
+
+# Tags
+tags = {
+  Environment = "prod"
+  Project     = "fleetpulse"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+}
