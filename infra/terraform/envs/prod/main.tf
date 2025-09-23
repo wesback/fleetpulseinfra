@@ -98,6 +98,7 @@ module "monitor" {
   privatelink_subnet_id = module.vnet.privatelink_subnet_id
   key_vault_id          = module.keyvault.key_vault_id
   tags                  = local.common_tags
+  depends_on            = [module.keyvault]
 }
 
 # Azure Policy for Container Apps security

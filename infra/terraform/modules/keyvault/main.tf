@@ -31,6 +31,14 @@ resource "azurerm_key_vault" "main" {
   tags = var.tags
 }
 
+# Grant the deploying principal permissions to manage secrets in the Key Vault
+# Required because rbac_authorization_enabled = true disables access policies
+resource "azurerm_role_assignment" "kv_secrets_officer_deployer" {
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Private DNS Zone for Key Vault
 resource "azurerm_private_dns_zone" "keyvault" {
   name                = "privatelink.vaultcore.azure.net"
@@ -78,6 +86,7 @@ resource "azurerm_key_vault_secret" "cert_pfx" {
   key_vault_id = azurerm_key_vault.main.id
   content_type = "application/x-pkcs12"
   tags         = var.tags
+  depends_on   = [azurerm_role_assignment.kv_secrets_officer_deployer]
 }
 
 resource "azurerm_key_vault_secret" "cert_password" {
@@ -86,4 +95,5 @@ resource "azurerm_key_vault_secret" "cert_password" {
   key_vault_id = azurerm_key_vault.main.id
   content_type = "text/plain"
   tags         = var.tags
+  depends_on   = [azurerm_role_assignment.kv_secrets_officer_deployer]
 }

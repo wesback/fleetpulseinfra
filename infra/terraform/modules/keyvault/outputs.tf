@@ -27,3 +27,8 @@ output "private_endpoint_id" {
   description = "ID of the Key Vault private endpoint"
   value       = azurerm_private_endpoint.keyvault.id
 }
+
+output "secrets_role_assignment_id" {
+  description = "Role assignment ID granting deployer secrets officer role"
+  value       = azurerm_role_assignment.kv_secrets_officer_deployer.id
+}
