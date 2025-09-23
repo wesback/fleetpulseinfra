@@ -85,6 +85,7 @@ module "keyvault" {
   vnet_id               = module.vnet.vnet_id
   privatelink_subnet_id = module.vnet.privatelink_subnet_id
   tags                  = local.common_tags
+  manage_placeholder_secrets = false
 }
 
 # Azure Monitor with Application Insights and AMPLS

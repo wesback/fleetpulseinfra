@@ -28,3 +28,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "manage_placeholder_secrets" {
+  description = "Whether the module should create placeholder certificate secrets (requires data-plane network access). Leave false for initial deployment when running Terraform from outside the private network."
+  type        = bool
+  default     = false
+}

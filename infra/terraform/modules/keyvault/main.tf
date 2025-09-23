@@ -81,6 +81,7 @@ resource "azurerm_private_endpoint" "keyvault" {
 # These are created with dummy values and updated by CI/CD
 
 resource "azurerm_key_vault_secret" "cert_pfx" {
+  count        = var.manage_placeholder_secrets ? 1 : 0
   name         = "ssl-cert-pfx"
   value        = "placeholder-will-be-updated-by-cicd"
   key_vault_id = azurerm_key_vault.main.id
@@ -90,6 +91,7 @@ resource "azurerm_key_vault_secret" "cert_pfx" {
 }
 
 resource "azurerm_key_vault_secret" "cert_password" {
+  count        = var.manage_placeholder_secrets ? 1 : 0
   name         = "ssl-cert-password"
   value        = "placeholder-will-be-updated-by-cicd"
   key_vault_id = azurerm_key_vault.main.id

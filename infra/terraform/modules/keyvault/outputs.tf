@@ -14,13 +14,13 @@ output "key_vault_uri" {
 }
 
 output "cert_pfx_secret_id" {
-  description = "Secret ID for the PFX certificate"
-  value       = azurerm_key_vault_secret.cert_pfx.id
+  description = "Secret ID for the PFX certificate (null when not managed)"
+  value       = var.manage_placeholder_secrets ? azurerm_key_vault_secret.cert_pfx[0].id : null
 }
 
 output "cert_password_secret_id" {
-  description = "Secret ID for the certificate password"
-  value       = azurerm_key_vault_secret.cert_password.id
+  description = "Secret ID for the certificate password (null when not managed)"
+  value       = var.manage_placeholder_secrets ? azurerm_key_vault_secret.cert_password[0].id : null
 }
 
 output "private_endpoint_id" {
