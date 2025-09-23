@@ -1,7 +1,21 @@
 # Container Apps Module
 # Creates the FleetPulse applications: backend, frontend, and OpenTelemetry collector
 
-# Get current client configuration for managed identity
+# Get curre    }
+  }
+
+  # Secret for Application Insights connection string from Key Vault - conditional
+  dynamic "secret" {
+    for_each = var.application_insights_connection_string_secret_uri != null ? [1] : []
+    content {
+      name                = "app-insights-connection-string"
+      key_vault_secret_id = var.application_insights_connection_string_secret_uri
+      identity            = azurerm_user_assigned_identity.apps.id
+    }
+  }
+}
+
+# Backend Container Appnfiguration for managed identity
 data "azurerm_client_config" "current" {}
 
 # User-assigned managed identity for Container Apps
@@ -40,10 +54,22 @@ resource "azurerm_container_app" "otel_collector" {
       cpu    = var.app_resources.otel.cpu
       memory = var.app_resources.otel.memory
 
-      # Standard OpenTelemetry environment variables
-      env {
-        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
-        secret_name = "app-insights-connection-string"
+      # Standard OpenTelemetry environment variables - conditional based on secret availability
+      dynamic "env" {
+        for_each = var.application_insights_connection_string_secret_uri != null ? [1] : []
+        content {
+          name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+          secret_name = "app-insights-connection-string"
+        }
+      }
+
+      # Alternative: Direct connection string when not using Key Vault
+      dynamic "env" {
+        for_each = var.application_insights_connection_string_secret_uri == null && var.application_insights_connection_string != null ? [1] : []
+        content {
+          name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+          value = var.application_insights_connection_string
+        }
       }
 
       # Basic OTEL Collector configuration
@@ -226,11 +252,14 @@ resource "azurerm_container_app" "backend" {
     }
   }
 
-  # Secret for Application Insights connection string from Key Vault
-  secret {
-    name                = "app-insights-connection-string"
-    key_vault_secret_id = var.application_insights_connection_string_secret_uri
-    identity            = azurerm_user_assigned_identity.apps.id
+  # Secret for Application Insights connection string from Key Vault - conditional
+  dynamic "secret" {
+    for_each = var.application_insights_connection_string_secret_uri != null ? [1] : []
+    content {
+      name                = "app-insights-connection-string"
+      key_vault_secret_id = var.application_insights_connection_string_secret_uri
+      identity            = azurerm_user_assigned_identity.apps.id
+    }
   }
 }
 

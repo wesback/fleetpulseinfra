@@ -138,6 +138,7 @@ module "apps" {
   container_app_environment_domain                  = module.aca_env.default_domain
   key_vault_id                                      = module.keyvault.key_vault_id
   application_insights_connection_string_secret_uri = module.monitor.app_insights_connection_string_secret_uri
+  application_insights_connection_string            = module.monitor.application_insights_connection_string
   container_images                                  = var.container_images
   custom_domains                                    = var.custom_domains
   home_cidrs                                        = var.home_cidrs

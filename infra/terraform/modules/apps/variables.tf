@@ -29,8 +29,16 @@ variable "key_vault_id" {
 }
 
 variable "application_insights_connection_string_secret_uri" {
-  description = "Key Vault secret URI for Application Insights connection string"
+  description = "Key Vault secret URI for Application Insights connection string (null if not storing in Key Vault)"
   type        = string
+  default     = null
+}
+
+variable "application_insights_connection_string" {
+  description = "Application Insights connection string (used when not storing in Key Vault)"
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "container_images" {
