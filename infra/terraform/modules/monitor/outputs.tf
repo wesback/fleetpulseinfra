@@ -20,8 +20,8 @@ output "application_insights_connection_string" {
 }
 
 output "app_insights_connection_string_secret_uri" {
-  description = "Key Vault secret URI for Application Insights connection string"
-  value       = azurerm_key_vault_secret.app_insights_connection_string.versionless_id
+  description = "Key Vault secret URI for Application Insights connection string (null when not stored)"
+  value       = var.store_app_insights_connection_string ? azurerm_key_vault_secret.app_insights_connection_string[0].versionless_id : null
 }
 
 output "monitor_private_link_scope_id" {

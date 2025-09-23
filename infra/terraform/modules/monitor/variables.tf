@@ -33,3 +33,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "store_app_insights_connection_string" {
+  description = "Whether to store the Application Insights connection string as a Key Vault secret (requires data-plane access)."
+  type        = bool
+  default     = false
+}

@@ -376,6 +376,120 @@ terraform plan -var-file="terraform.tfvars"
 terraform apply -var-file="terraform.tfvars"
 ```
 
+### 3.1 Secret & Connection String Management Strategy
+
+By design this deployment does NOT create Key Vault secrets during the first apply. Two module toggles control this:
+
+| Module | Variable | Default | Purpose |
+|--------|----------|---------|---------|
+| `keyvault` | `manage_placeholder_secrets` | `false` | Would create placeholder `ssl-cert-pfx` & `ssl-cert-password` secrets (kept off to avoid storing sensitive data in state) |
+| `monitor` | `store_app_insights_connection_string` | `false` | Would persist the App Insights connection string as a secret (apps can alternatively set it via config) |
+
+Why keep them `false` initially?
+- Avoids Key Vault data-plane calls while Terraform is running from outside the private network (no 403 errors)
+- Prevents secret values (even placeholders) from entering Terraform state
+- Encourages principle: Terraform manages infrastructure, pipelines manage secret data
+
+When to enable later (optional):
+- Only if you explicitly want Terraform to track the existence of those secrets. You would then re-run `terraform apply` from inside the VNet (self‑hosted runner / jump box) after flipping to `true`.
+
+Recommended approach: leave both `false` permanently and inject real secrets externally (next section).
+
+### 3.2 Injecting Secrets Externally (Recommended)
+
+After the first successful apply, create/import secrets using a process that runs inside the VNet or over the private connection.
+
+1. Provision a secure execution environment inside the VNet (options):
+     - Self-hosted GitHub Actions runner VM with a System Assigned or User Assigned Managed Identity
+     - Azure Container Instance or Container App job with Managed Identity
+     - Admin workstation connected via the Site-to-Site VPN
+2. Grant the identity appropriate RBAC on the Key Vault:
+     - For secrets only: `Key Vault Secrets Officer` (or a custom role with get/set/list)
+     - For certificate import: also `Key Vault Certificates Officer`
+3. Use Azure CLI to set/import secrets (examples below)
+
+Raw secret (PFX as base64 if large/binary):
+```bash
+base64 -w0 cert.pfx > cert.pfx.b64
+az keyvault secret set --vault-name <your_kv_name> \
+    --name ssl-cert-pfx --file cert.pfx.b64 --encoding base64
+
+az keyvault secret set --vault-name <your_kv_name> \
+    --name ssl-cert-password --value "$PFX_PASSWORD"
+```
+
+Certificate import (preferred – enables lifecycle features):
+```bash
+az keyvault certificate import --vault-name <your_kv_name> \
+    --name ssl-tls-cert --file cert.pfx --password "$PFX_PASSWORD"
+```
+
+Application Insights connection string (optional if not injected via env):
+```bash
+APPINSIGHTS_CS=$(az monitor app-insights component show \
+    --app <app_insights_name> \
+    --resource-group <resource_group> \
+    --query connectionString -o tsv)
+az keyvault secret set --vault-name <your_kv_name> \
+    --name app-insights-connection-string --value "$APPINSIGHTS_CS"
+```
+
+### 3.3 GitHub Actions Secret Injection (Example)
+
+Example job using a self-hosted runner inside the VNet and OIDC auth (identity must have proper Key Vault RBAC):
+```yaml
+jobs:
+    inject-secrets:
+        runs-on: self-hosted
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            - name: Azure Login
+                uses: azure/login@v2
+                with:
+                    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+                    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+                    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+            - name: Import TLS Certificate
+                env:
+                    PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
+                run: |
+                    az keyvault certificate import \
+                        --vault-name $KV_NAME \
+                        --name ssl-tls-cert \
+                        --file cert.pfx \
+                        --password "$PFX_PASSWORD"
+
+            - name: Store App Insights Connection String
+                if: ${{ env.STORE_AI_CS == 'true' }}
+                run: |
+                    CS=$(az monitor app-insights component show \
+                        --app $AI_NAME \
+                        --resource-group $RG \
+                        --query connectionString -o tsv)
+                    az keyvault secret set --vault-name $KV_NAME \
+                        --name app-insights-connection-string --value "$CS"
+```
+
+Environment variables (via workflow or env block): `KV_NAME`, `AI_NAME`, `RG`, optional `STORE_AI_CS=true`.
+
+Rotation: rerun the job with updated PFX / password; Key Vault versions the secret/certificate automatically.
+
+### 3.4 (Optional) Enabling Terraform Management Later
+
+1. Ensure you can run Terraform from inside the VNet (self‑hosted runner).
+2. Set in `envs/prod/main.tf`:
+     ```hcl
+     manage_placeholder_secrets = true
+     store_app_insights_connection_string = true
+     ```
+3. `terraform plan` — expect additions of the secret resources.
+4. `terraform apply` — placeholder secrets (and connection string) appear in state.
+
+Note: Avoid storing real certificate password in Terraform variables/state; keep placeholders only or continue external management.
+
 ### 4. Configure DNS and VPN
 
 After deployment, configure:
@@ -454,20 +568,30 @@ curl -k https://frontend.backelant.eu
 
 ### Certificate Management
 
-1. **Upload certificate to Key Vault**:
-   ```bash
-   az keyvault secret set --vault-name YOUR_KV_NAME \
-     --name ssl-cert-pfx --file certificate.pfx
-   
-   az keyvault secret set --vault-name YOUR_KV_NAME \
-     --name ssl-cert-password --value "cert-password"
-   ```
+1. **Recommended (certificate import)**:
+     ```bash
+     az keyvault certificate import --vault-name YOUR_KV_NAME \
+         --name ssl-tls-cert --file certificate.pfx --password "cert-password"
+     ```
 
-2. **Run post-deploy configuration**:
-   ```bash
-   # Triggers automatically after Terraform deployment
-   # Or manually via GitHub Actions
-   ```
+2. **Alternative (raw secrets)**:
+     ```bash
+     base64 -w0 certificate.pfx > certificate.pfx.b64
+     az keyvault secret set --vault-name YOUR_KV_NAME \
+         --name ssl-cert-pfx --file certificate.pfx.b64 --encoding base64
+     az keyvault secret set --vault-name YOUR_KV_NAME \
+         --name ssl-cert-password --value "cert-password"
+     ```
+
+3. **App Insights connection string (optional)**:
+     ```bash
+     APPINSIGHTS_CS=$(az monitor app-insights component show \
+         --app YOUR_AI_NAME \
+         --resource-group YOUR_RG \
+         --query connectionString -o tsv)
+     az keyvault secret set --vault-name YOUR_KV_NAME \
+         --name app-insights-connection-string --value "$APPINSIGHTS_CS"
+     ```
 
 ### Scaling Applications
 

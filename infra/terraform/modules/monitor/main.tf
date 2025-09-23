@@ -137,6 +137,7 @@ resource "azurerm_private_endpoint" "monitor" {
 
 # Store Application Insights connection string in Key Vault
 resource "azurerm_key_vault_secret" "app_insights_connection_string" {
+  count        = var.store_app_insights_connection_string ? 1 : 0
   name         = "app-insights-connection-string"
   value        = azurerm_application_insights.main.connection_string
   key_vault_id = var.key_vault_id
