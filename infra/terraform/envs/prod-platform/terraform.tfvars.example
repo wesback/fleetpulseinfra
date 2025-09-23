@@ -1,0 +1,33 @@
+# FleetPulse Production Platform Layer Configuration
+# Copy this file to terraform.tfvars and update with actual values
+
+environment  = "prod"
+project_name = "fleetpulse"
+
+# Backend configuration for remote state
+backend_rg        = "rg-terraform-state-prod" 
+backend_sa        = "stterraformstateprod"
+backend_container = "tfstate"
+
+# Custom Domains
+custom_domains = {
+  backend  = "backend.backelant.eu"
+  frontend = "frontend.backelant.eu"
+  wildcard = "*.backelant.eu"
+}
+
+# ACA Workload Profile
+aca_workload_profile = {
+  name                  = "Consumption"
+  workload_profile_type = "Consumption"
+  minimum_count         = 0
+  maximum_count         = 10
+}
+
+# Tags
+tags = {
+  Environment = "prod"
+  Project     = "fleetpulse"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+}

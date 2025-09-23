@@ -365,14 +365,36 @@ How the workflow consumes values
 
 ### 3. Deploy Infrastructure
 
+**⚠️ IMPORTANT**: The infrastructure is now split into layered deployments for better security and maintainability. 
+
+For **new deployments**, use the layered approach:
+
 ```bash
-# Initialize Terraform
+# Deploy in order: network → shared → platform → apps
+cd infra/terraform/envs/prod-network
+terraform init -backend-config=backend.conf
+terraform apply
+
+cd ../prod-shared  
+terraform init -backend-config=backend.conf
+terraform apply
+
+cd ../prod-platform
+terraform init -backend-config=backend.conf  
+terraform apply
+
+cd ../prod-apps
+terraform init -backend-config=backend.conf
+terraform apply
+```
+
+See **[Terraform Layered Deployment Guide](docs/terraform-layered-deployment.md)** for complete setup instructions.
+
+**Legacy monolithic deployment** (being deprecated):
+```bash
+cd infra/terraform/envs/prod
 terraform init
-
-# Plan deployment
 terraform plan -var-file="terraform.tfvars"
-
-# Apply (or use GitHub Actions)
 terraform apply -var-file="terraform.tfvars"
 ```
 
@@ -516,11 +538,12 @@ curl -k https://frontend.backelant.eu
 
 ```
 ├── infra/terraform/
-│   ├── envs/prod/              # Production environment
-│   │   ├── main.tf             # Root module
-│   │   ├── variables.tf        # Variable definitions
-│   │   ├── outputs.tf          # Outputs
-│   │   └── terraform.tfvars.example
+│   ├── envs/                   # Environment-specific configurations
+│   │   ├── prod/               # Legacy monolithic production (being deprecated)
+│   │   ├── prod-network/       # 🌐 Network layer (VNet, VPN, DNS)
+│   │   ├── prod-shared/        # 🔐 Shared services (KeyVault, Storage, Monitor)
+│   │   ├── prod-platform/      # 🚀 Platform layer (Container Apps Environment)
+│   │   └── prod-apps/          # ⚙️ Applications layer (Backend, Frontend, OTEL)
 │   └── modules/                # Reusable modules
 │       ├── vnet/               # Virtual network
 │       ├── gateway/            # VPN gateway

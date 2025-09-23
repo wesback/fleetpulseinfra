@@ -1,0 +1,9 @@
+# Backend configuration for prod-apps layer
+# Copy this file to backend.conf and update with actual values
+# Usage: terraform init -backend-config=backend.conf
+
+resource_group_name  = "rg-terraform-state-prod"
+storage_account_name = "stterraformstateprod"
+container_name       = "tfstate"
+key                  = "prod-apps.tfstate"
+use_azuread_auth     = true

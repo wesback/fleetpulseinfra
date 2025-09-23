@@ -1,0 +1,31 @@
+# FleetPulse Production Network Layer Configuration
+# Copy this file to terraform.tfvars and update with actual values
+
+resource_group_name = "rg-fleetpulse-prod"
+location           = "West Europe"
+environment        = "prod"
+project_name       = "fleetpulse"
+
+# Networking Configuration
+vnet_cidr = "10.20.0.0/24"
+
+subnet_cidrs = {
+  aca_infra            = "10.20.0.0/27"   # 30 IPs
+  gateway              = "10.20.0.32/27"  # 30 IPs (GatewaySubnet)
+  privatelink          = "10.20.0.64/27"  # 30 IPs
+  dns_resolver_inbound = "10.20.0.128/27" # 30 IPs
+}
+
+# VPN Configuration
+vpn_gateway_sku        = "VpnGw1"
+on_premises_gateway_ip = "203.0.113.1"        # TODO: Replace with actual OPNsense public IP
+on_premises_networks   = ["192.168.0.0/24"]   # TODO: Replace with actual on-premises CIDRs
+vpn_shared_key         = "PLACEHOLDER-CHANGE-ME" # TODO: Set actual PSK
+
+# Tags
+tags = {
+  Environment = "prod"
+  Project     = "fleetpulse"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+}
