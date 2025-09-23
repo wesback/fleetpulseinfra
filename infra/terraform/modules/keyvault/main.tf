@@ -13,7 +13,7 @@ resource "random_string" "keyvault_suffix" {
 
 # Key Vault
 resource "azurerm_key_vault" "main" {
-  name                        = "${replace(var.name_prefix, "_", "-")}-kv-${random_string.keyvault_suffix.result}"
+  name                        = "kv-${substr(replace(replace(var.name_prefix, "_", "-"), "fleetpulse-", "fp-"), 0, 10)}-${random_string.keyvault_suffix.result}"
   location                    = var.location
   resource_group_name         = var.resource_group_name
   enabled_for_disk_encryption = true
