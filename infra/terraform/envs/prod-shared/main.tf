@@ -1,11 +1,3 @@
-provider "azurerm" {
-  features {
-    storage {
-      use_azuread_auth = true
-    }
-  }
-}
-
 # FleetPulse Production Shared Infrastructure Layer
 # Contains: Key Vault, Storage, Monitor (Log Analytics, App Insights)
 
