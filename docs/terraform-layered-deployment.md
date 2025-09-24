@@ -63,7 +63,7 @@ graph TB
 
 ### 1. Remote State Storage
 
-Set up Azure Storage for Terraform remote state:
+Set up Azure Storage for Terraform remote state (Azure Policy enforces Azure AD authentication only — shared keys stay disabled):
 
 ```bash
 # Create resource group for Terraform state
@@ -74,13 +74,17 @@ az storage account create \
   --name stwbtfstateprod \
   --resource-group rg-terraform-state-prod \
   --location "West Europe" \
-  --sku Standard_LRS \
-  --encryption-services blob
+    --sku Standard_LRS \
+    --encryption-services blob \
+    --allow-shared-key-access false
 
 # Create container
 az storage container create \
   --name tfstate \
-  --account-name stwbtfstateprod
+    --account-name stwbtfstateprod \
+    --auth-mode login
+
+The backend configuration must also rely on Azure AD. Keep `use_azuread_auth = true` in every `backend.conf`, and do **not** add `access_key` or `sas_token` entries — they will be rejected by policy and the deployment script. The `scripts/deploy-layers.sh init` helper now validates these settings and will refuse to run if shared key auth is still enabled on the storage account.
 ```
 
 Grant the identity that runs Terraform **Storage Blob Data Contributor** (or **Storage Blob Data Owner**) access to the state container so Azure AD authentication can list and read blobs:
@@ -97,9 +101,21 @@ az role assignment create \
     --assignee-principal-type User \
     --role "Storage Blob Data Contributor" \
     --scope "$STORAGE_SCOPE/blobServices/default/containers/tfstate"
+
+Ensure the storage account remains compliant with the policy:
+
+```bash
+az storage account show \
+    --name stwbtfstateprod \
+    --resource-group rg-terraform-state-prod \
+    --query "allowSharedKeyAccess"
+# Expected: false
+```
 ```
 
 If the identity is a service principal or managed identity, adjust `--assignee-principal-type` accordingly. Without this role assignment, Terraform init will fail with `AuthorizationPermissionMismatch` (HTTP 403) when it tries to enumerate the state blobs.
+
+> **Reminder**: Commands such as `az storage account keys list` or anything requiring shared keys will fail by design. Use Azure AD role assignments and `az login`/OIDC workflows instead.
 
 ### 2. Configure Authentication
 
@@ -133,6 +149,7 @@ cp backend.conf.example backend.conf
 # - vpn_shared_key: Actual pre-shared key
 
 # Edit backend.conf with your storage account details
+# (Ensure `use_azuread_auth = true` and leave out access keys — Azure AD only)
 
 # Initialize and deploy
 terraform init -backend-config=backend.conf
@@ -150,6 +167,7 @@ cp terraform.tfvars.example terraform.tfvars
 cp backend.conf.example backend.conf
 
 # Edit backend.conf with your storage account details
+# (Ensure `use_azuread_auth = true` and leave out access keys — Azure AD only)
 # terraform.tfvars should match your backend configuration
 
 # Initialize and deploy
@@ -169,6 +187,7 @@ cp backend.conf.example backend.conf
 
 # Edit terraform.tfvars with your custom domains
 # Edit backend.conf with your storage account details
+# (Ensure `use_azuread_auth = true` and leave out access keys — Azure AD only)
 
 # Initialize and deploy
 terraform init -backend-config=backend.conf
@@ -189,6 +208,8 @@ cp backend.conf.example backend.conf
 # - container_images: Your actual container image versions
 # - custom_domains: Your custom domains
 # - home_cidrs: Your home network CIDRs for access restrictions
+# Edit backend.conf with your storage account details
+# (Ensure `use_azuread_auth = true` and leave out access keys — Azure AD only)
 
 # Initialize and deploy
 terraform init -backend-config=backend.conf
@@ -296,7 +317,7 @@ After each layer deployment, verify:
 - Use Azure AD authentication for backend storage
 - Implement RBAC on Terraform state storage
 - Consider using separate storage accounts per environment
-- Rotate access keys regularly
+- Confirm shared key access remains disabled (policy compliant)
 
 ## Next Steps
 

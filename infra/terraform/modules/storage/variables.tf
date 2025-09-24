@@ -30,9 +30,14 @@ variable "tags" {
 }
 
 variable "shared_access_key_enabled" {
-  description = "Whether to enable shared key authentication for the storage account. Disable to comply with strict policies."
+  description = "Shared key authentication flag. Must remain disabled because Azure Policy blocks storage account keys."
   type        = bool
-  default     = true
+  default     = false
+
+  validation {
+    condition     = var.shared_access_key_enabled == false
+    error_message = "Shared key authentication is prohibited by policy. Use Azure AD (OAuth) authentication instead."
+  }
 }
 
 variable "default_to_oauth_authentication" {

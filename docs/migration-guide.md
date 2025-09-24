@@ -39,7 +39,7 @@ terraform state list > resources-before-migration.txt
 
 ### Step 2: Set Up Remote State Backend
 
-If not already done, create the storage account for Terraform state:
+If not already done, create the storage account for Terraform state (shared key access is blocked by policy, so the backend must use Azure AD auth):
 
 ```bash
 # Create resource group for Terraform state
@@ -50,12 +50,31 @@ az storage account create \
   --name stwbtfstateprod \
   --resource-group rg-terraform-state-prod \
   --location "West Europe" \
-  --sku Standard_LRS
+  --sku Standard_LRS \
+  --encryption-services blob \
+  --allow-shared-key-access false
 
 # Create container
 az storage container create \
   --name tfstate \
-  --account-name stwbtfstateprod
+  --account-name stwbtfstateprod \
+  --auth-mode login
+
+# Confirm the policy-compliant setting
+az storage account show \
+  --name stwbtfstateprod \
+  --resource-group rg-terraform-state-prod \
+  --query "allowSharedKeyAccess"
+
+# Grant the identity running Terraform Blob Data Contributor on the container scope
+TERRAFORM_PRINCIPAL_OBJECT_ID="$(az ad signed-in-user show --query id -o tsv)"  # adjust for service principals/managed identities
+STORAGE_SCOPE="$(az storage account show --name stwbtfstateprod --resource-group rg-terraform-state-prod --query id -o tsv)"
+
+az role assignment create \
+  --assignee-object-id "$TERRAFORM_PRINCIPAL_OBJECT_ID" \
+  --assignee-principal-type User \
+  --role "Storage Blob Data Contributor" \
+  --scope "$STORAGE_SCOPE/blobServices/default/containers/tfstate"
 ```
 
 ### Step 3: Configure Each Layer
@@ -71,6 +90,8 @@ for layer in prod-network prod-shared prod-platform prod-apps; do
   cp terraform.tfvars.example terraform.tfvars
   cp backend.conf.example backend.conf
   # Edit files with your actual values
+  # Ensure backend.conf retains use_azuread_auth = true (no access_key/sas_token entries)
+  # The deploy script now checks that storage accounts keep shared key auth disabled
   cd ..
 done
 ```

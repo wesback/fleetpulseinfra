@@ -236,8 +236,18 @@ nslookup <KEYVAULT_NAME>.vault.azure.net
 
 ```bash
 # Test storage account access
-az storage blob list --account-name <STORAGE_ACCOUNT> --container-name '$root'
-# Expected: Access only via private endpoint
+az storage blob list \
+  --account-name <STORAGE_ACCOUNT> \
+  --container-name '$root' \
+  --auth-mode login
+# Expected: Access only via private endpoint (requires Azure AD auth, shared keys disabled)
+
+# Verify shared key access remains disabled
+az storage account show \
+  --name <STORAGE_ACCOUNT> \
+  --resource-group <RESOURCE_GROUP_NAME> \
+  --query "allowSharedKeyAccess"
+# Expected: false
 
 # Verify private endpoint resolution
 nslookup <STORAGE_ACCOUNT>.file.core.windows.net
@@ -345,12 +355,14 @@ ping -c 10 backend.backelant.eu
 # Verify Azure Files backup/snapshot capability
 az storage share snapshot \
   --name fleetpulse \
-  --account-name <STORAGE_ACCOUNT>
+  --account-name <STORAGE_ACCOUNT> \
+  --auth-mode login
 
 # List snapshots
 az storage share snapshot list \
   --name fleetpulse \
-  --account-name <STORAGE_ACCOUNT>
+  --account-name <STORAGE_ACCOUNT> \
+  --auth-mode login
 ```
 
 **Checklist:**

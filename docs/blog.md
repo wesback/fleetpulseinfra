@@ -278,26 +278,18 @@ service:
 
 ### Storage Strategy
 
-**Decision**: Azure Files with private endpoint + post-deploy key configuration
+**Decision**: Azure Files with private endpoint + managed identity authentication
 
 **Rationale**:
 - **Compatibility**: Drop-in replacement for Docker volume mounts
 - **Performance**: SMB 3.0 with encryption in transit
 - **Security**: Private endpoint ensures traffic stays in VNET
-- **State management**: Storage key not stored in Terraform state
+- **Compliance**: Shared key access disabled by policy; only Azure AD tokens permitted
 
 **Implementation**:
-```bash
-# Post-deploy script configures storage without exposing key in Terraform
-az containerapp env storage set \
-  --name $ACA_ENV_NAME \
-  --resource-group $RESOURCE_GROUP_NAME \
-  --storage-name "files" \
-  --azure-file-account-name $STORAGE_ACCOUNT_NAME \
-  --azure-file-account-key "$STORAGE_KEY" \
-  --azure-file-share-name "fleetpulse" \
-  --access-mode ReadWrite
-```
+1. Assign the Container Apps managed identity the `Storage File Data SMB Share Contributor` role on the storage account scope.
+2. Configure the Container Apps environment storage using Azure AD authentication (no `--azure-file-account-key`).
+3. Mount the share from applications using Azure AD credentials or managed identity tokens in accordance with the [Azure Files identity-based access guidance](https://learn.microsoft.com/azure/storage/files/storage-files-identity-auth). 
 
 ### Certificate Management Strategy
 
@@ -395,7 +387,7 @@ graph TD
    **Solution**: Post-deploy CLI scripts handle certificate binding
 
 2. **Challenge**: Storage account keys in Terraform state
-   **Solution**: Post-deploy configuration retrieves keys at runtime
+  **Solution**: Enforce Azure AD-only access and disable shared keys at the platform layer
 
 3. **Challenge**: Complex DNS configuration
    **Solution**: Automated output generation with clear instructions

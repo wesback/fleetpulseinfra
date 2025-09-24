@@ -367,6 +367,8 @@ How the workflow consumes values
 
 **⚠️ IMPORTANT**: The infrastructure is now split into layered deployments for better security and maintainability. 
 
+> **Heads-up**: Azure Policy blocks shared key auth on the state storage account. Keep `use_azuread_auth = true` in each `backend.conf`, omit `access_key`/`sas_token`, and ensure the storage account has `allowSharedKeyAccess` set to `false`. The layered deployment script will validate these settings during `init`.
+
 For **new deployments**, use the layered approach:
 
 ```bash
@@ -632,17 +634,20 @@ az containerapp update --name fleetpulse-prod-frontend \
 
 ### Data Migration
 
-Migrate data from on-premises to Azure Files:
+Migrate data from on-premises to Azure Files using Azure AD authentication (shared keys are disabled by policy):
 
-```bash
-# Mount Azure Files share locally (from on-premises)
-sudo mkdir -p /mnt/azure-files
-sudo mount -t cifs //STORAGE_ACCOUNT.file.core.windows.net/fleetpulse \
-  /mnt/azure-files -o username=STORAGE_ACCOUNT,password=STORAGE_KEY
+1. Grant the operator the `Storage File Data SMB Share Contributor` role on the storage account scope.
+2. Use the Azure CLI to copy files via Azure AD authentication:
 
-# Copy data
-rsync -av /mnt/data/dockervolumes/fleetpulse/ /mnt/azure-files/
-```
+        ```bash
+        az storage file upload-batch \
+            --account-name <STORAGE_ACCOUNT> \
+            --destination fleetpulse \
+            --source /mnt/data/dockervolumes/fleetpulse \
+            --auth-mode login
+        ```
+
+For larger migrations, consider using Azure Data Box or an AzCopy job with `--auth-mode login` to remain compliant.
 
 ### Disaster Recovery
 
@@ -706,7 +711,7 @@ Cost optimization tips:
 - Check Key Vault access and secrets
 
 **Storage mount fails:**
-- Verify storage account key in ACA environment
+- Confirm the Container Apps environment storage is configured with managed identity (shared keys remain disabled)
 - Check private endpoint connectivity
 - Validate Azure Files share permissions
 

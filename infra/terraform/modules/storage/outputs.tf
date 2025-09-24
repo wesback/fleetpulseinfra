@@ -14,7 +14,7 @@ output "storage_share_name" {
 }
 
 output "storage_account_primary_access_key" {
-  description = "Primary access key for the storage account"
+  description = "Primary access key for the storage account (will be null because shared key auth is disabled by policy)"
   value       = var.shared_access_key_enabled ? try(azurerm_storage_account.main.primary_access_key, null) : null
   sensitive   = true
 }

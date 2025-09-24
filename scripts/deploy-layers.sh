@@ -109,10 +109,11 @@ check_prerequisites() {
 init_layer() {
     local layer=$1
     local layer_dir="$TERRAFORM_DIR/$layer"
+    local backend_conf="$layer_dir/backend.conf"
     
     log_info "Initializing layer: $layer"
     
-    if [[ ! -f "$layer_dir/backend.conf" ]]; then
+    if [[ ! -f "$backend_conf" ]]; then
         if [[ -f "$layer_dir/backend.conf.example" ]]; then
             log_warning "backend.conf not found, copying from example"
             cp "$layer_dir/backend.conf.example" "$layer_dir/backend.conf"
@@ -120,6 +121,39 @@ init_layer() {
         else
             log_error "No backend configuration found for $layer"
             return 1
+        fi
+    fi
+
+    if ! grep -Eq '^\s*use_azuread_auth\s*=\s*true' "$backend_conf"; then
+        log_error "use_azuread_auth must be set to true in $backend_conf. Azure Policy blocks shared key auth; update the backend configuration to rely on Azure AD before continuing."
+        exit 1
+    fi
+
+    if grep -Eq '^\s*(access_key|sas_token)\s*=' "$backend_conf"; then
+        log_error "Key-based credentials found in $backend_conf. Remove access_key/sas_token entries and rely on Azure AD authentication."
+        exit 1
+    fi
+
+    local backend_rg
+    backend_rg=$(grep -E '^\s*resource_group_name' "$backend_conf" | tail -n1 | awk -F'=' '{print $2}' | tr -d ' "')
+    local backend_sa
+    backend_sa=$(grep -E '^\s*storage_account_name' "$backend_conf" | tail -n1 | awk -F'=' '{print $2}' | tr -d ' "')
+
+    if [[ -n "$backend_rg" && -n "$backend_sa" ]]; then
+        local allow_shared_key
+        allow_shared_key=$(az storage account show \
+            --name "$backend_sa" \
+            --resource-group "$backend_rg" \
+            --query "allowSharedKeyAccess" \
+            -o tsv 2>/dev/null || echo "unknown")
+
+        if [[ "$allow_shared_key" == "true" ]]; then
+            log_error "Storage account $backend_sa still allows shared key access. Disable it with: az storage account update --name $backend_sa --resource-group $backend_rg --allow-shared-key-access false"
+            exit 1
+        elif [[ "$allow_shared_key" == "false" ]]; then
+            log_info "Shared key access already disabled for storage account $backend_sa"
+        else
+            log_warning "Could not verify shared key access for storage account $backend_sa (resource group: $backend_rg)."
         fi
     fi
     
