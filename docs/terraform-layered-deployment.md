@@ -71,7 +71,7 @@ az group create --name rg-terraform-state-prod --location "West Europe"
 
 # Create storage account (globally unique name required)
 az storage account create \
-  --name stterraformstateprod \
+  --name stwbtfstateprod \
   --resource-group rg-terraform-state-prod \
   --location "West Europe" \
   --sku Standard_LRS \
@@ -80,8 +80,26 @@ az storage account create \
 # Create container
 az storage container create \
   --name tfstate \
-  --account-name stterraformstateprod
+  --account-name stwbtfstateprod
 ```
+
+Grant the identity that runs Terraform **Storage Blob Data Contributor** (or **Storage Blob Data Owner**) access to the state container so Azure AD authentication can list and read blobs:
+
+```bash
+TERRAFORM_PRINCIPAL_OBJECT_ID="$(az ad signed-in-user show --query id -o tsv)"  # or service principal/object ID used in CI/CD
+STORAGE_SCOPE="$(az storage account show \
+    --name stwbtfstateprod \
+    --resource-group rg-terraform-state-prod \
+    --query id -o tsv)"
+
+az role assignment create \
+    --assignee-object-id "$TERRAFORM_PRINCIPAL_OBJECT_ID" \
+    --assignee-principal-type User \
+    --role "Storage Blob Data Contributor" \
+    --scope "$STORAGE_SCOPE/blobServices/default/containers/tfstate"
+```
+
+If the identity is a service principal or managed identity, adjust `--assignee-principal-type` accordingly. Without this role assignment, Terraform init will fail with `AuthorizationPermissionMismatch` (HTTP 403) when it tries to enumerate the state blobs.
 
 ### 2. Configure Authentication
 

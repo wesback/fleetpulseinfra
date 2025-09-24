@@ -6,7 +6,7 @@
 # terraform {
 #   backend "azurerm" {
 #     resource_group_name   = "rg-terraform-state-prod"
-#     storage_account_name  = "stterraformstateprod"     # TODO: Update with actual storage account
+#     storage_account_name  = "stwbtfstateprod"     # TODO: Update with actual storage account
 #     container_name        = "tfstate"
 #     key                   = "fleetpulse/prod.tfstate"
 #     use_azuread_auth     = true

@@ -20,7 +20,7 @@ variable "backend_rg" {
 variable "backend_sa" {
   description = "Storage account name for Terraform backend"
   type        = string
-  default     = "stterraformstateprod"
+  default     = "stwbtfstateprod"
 }
 
 variable "backend_container" {

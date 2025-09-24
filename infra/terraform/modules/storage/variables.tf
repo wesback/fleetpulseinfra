@@ -28,3 +28,33 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "shared_access_key_enabled" {
+  description = "Whether to enable shared key authentication for the storage account. Disable to comply with strict policies."
+  type        = bool
+  default     = true
+}
+
+variable "default_to_oauth_authentication" {
+  description = "Whether to default data-plane requests to use Azure AD (OAuth) authentication."
+  type        = bool
+  default     = false
+}
+
+variable "create_storage_share" {
+  description = "Controls whether an Azure Files share is created."
+  type        = bool
+  default     = true
+}
+
+variable "storage_share_name" {
+  description = "Name of the Azure Files share to create when enabled."
+  type        = string
+  default     = "fleetpulse"
+}
+
+variable "storage_share_quota_gb" {
+  description = "Quota in GB for the Azure Files share."
+  type        = number
+  default     = 100
+}

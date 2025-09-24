@@ -47,7 +47,7 @@ az group create --name rg-terraform-state-prod --location "West Europe"
 
 # Create storage account (use unique name)
 az storage account create \
-  --name stterraformstateprod \
+  --name stwbtfstateprod \
   --resource-group rg-terraform-state-prod \
   --location "West Europe" \
   --sku Standard_LRS
@@ -55,7 +55,7 @@ az storage account create \
 # Create container
 az storage container create \
   --name tfstate \
-  --account-name stterraformstateprod
+  --account-name stwbtfstateprod
 ```
 
 ### Step 3: Configure Each Layer

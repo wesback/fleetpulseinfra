@@ -10,12 +10,12 @@ output "storage_account_name" {
 
 output "storage_share_name" {
   description = "Name of the Azure Files share"
-  value       = azurerm_storage_share.fleetpulse.name
+  value       = var.create_storage_share ? azapi_resource.storage_share[0].name : null
 }
 
 output "storage_account_primary_access_key" {
   description = "Primary access key for the storage account"
-  value       = azurerm_storage_account.main.primary_access_key
+  value       = var.shared_access_key_enabled ? try(azurerm_storage_account.main.primary_access_key, null) : null
   sensitive   = true
 }
 

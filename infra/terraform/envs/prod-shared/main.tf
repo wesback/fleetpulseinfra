@@ -34,6 +34,8 @@ module "storage" {
   vnet_id               = data.terraform_remote_state.network.outputs.vnet_id
   privatelink_subnet_id = data.terraform_remote_state.network.outputs.privatelink_subnet_id
   tags                  = local.common_tags
+  shared_access_key_enabled       = false
+  default_to_oauth_authentication = true
 }
 
 # Key Vault for secrets and certificates

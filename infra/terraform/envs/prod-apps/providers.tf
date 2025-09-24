@@ -19,7 +19,7 @@ terraform {
     # Backend configuration will be provided via backend config file or CLI
     # Example:
     # resource_group_name   = "rg-terraform-state-prod"
-    # storage_account_name  = "stterraformstateprod"
+    # storage_account_name  = "stwbtfstateprod"
     # container_name        = "tfstate"
     key = "prod-apps.tfstate"
     # use_azuread_auth     = true

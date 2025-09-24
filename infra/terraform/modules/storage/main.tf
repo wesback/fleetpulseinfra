@@ -21,6 +21,12 @@ resource "azurerm_storage_account" "main" {
   min_tls_version                 = "TLS1_2"
   public_network_access_enabled   = false
   allow_nested_items_to_be_public = false
+  shared_access_key_enabled       = var.shared_access_key_enabled
+  default_to_oauth_authentication = var.default_to_oauth_authentication
+
+  identity {
+    type = "SystemAssigned"
+  }
   
   # Enable soft delete for files
   share_properties {
@@ -32,12 +38,20 @@ resource "azurerm_storage_account" "main" {
   tags = var.tags
 }
 
-# Azure Files Share
-resource "azurerm_storage_share" "fleetpulse" {
-  name                 = "fleetpulse"
-  storage_account_id   = azurerm_storage_account.main.id
-  quota                = 100 # GB
-  
+# Azure Files Share (created via management plane API to support OAuth-only accounts)
+resource "azapi_resource" "storage_share" {
+  count     = var.create_storage_share ? 1 : 0
+  type      = "Microsoft.Storage/storageAccounts/fileServices/shares@2023-01-01"
+  name      = var.storage_share_name
+  parent_id = "${azurerm_storage_account.main.id}/fileServices/default"
+
+  body = jsonencode({
+    properties = {
+      enabledProtocols = "SMB"
+      shareQuota       = var.storage_share_quota_gb
+    }
+  })
+
   depends_on = [azurerm_storage_account.main]
 }
 

@@ -6,7 +6,7 @@ project_name = "fleetpulse"
 
 # Backend configuration for remote state
 backend_rg        = "rg-terraform-state-prod"
-backend_sa        = "stterraformstateprod"
+backend_sa        = "stwbtfstateprod"
 backend_container = "tfstate"
 
 # Tags

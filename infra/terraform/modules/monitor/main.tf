@@ -120,6 +120,11 @@ resource "azurerm_private_endpoint" "monitor" {
   subnet_id           = var.privatelink_subnet_id
   tags                = var.tags
 
+  depends_on = [
+    azurerm_monitor_private_link_scoped_service.law,
+    azurerm_monitor_private_link_scoped_service.ai
+  ]
+
   private_service_connection {
     name                           = "${var.name_prefix}-monitor-psc"
     private_connection_resource_id = azurerm_monitor_private_link_scope.main.id
@@ -130,7 +135,10 @@ resource "azurerm_private_endpoint" "monitor" {
   private_dns_zone_group {
     name = "monitor-dns-zone-group"
     private_dns_zone_ids = [
-      azurerm_private_dns_zone.monitor.id
+      azurerm_private_dns_zone.monitor.id,
+      azurerm_private_dns_zone.oms.id,
+      azurerm_private_dns_zone.ods.id,
+      azurerm_private_dns_zone.agentsvc.id
     ]
   }
 }

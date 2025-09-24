@@ -379,7 +379,7 @@ trigger:
 variables:
   terraformVersion: '1.13.3'
   backendRG: 'rg-terraform-state-prod'
-  backendSA: 'stterraformstateprod'
+  backendSA: 'stwbtfstateprod'
   backendContainer: 'tfstate'
 
 stages:

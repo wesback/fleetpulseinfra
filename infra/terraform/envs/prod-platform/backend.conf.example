@@ -3,7 +3,7 @@
 # Usage: terraform init -backend-config=backend.conf
 
 resource_group_name  = "rg-terraform-state-prod"
-storage_account_name = "stterraformstateprod"
+storage_account_name = "stwbtfstateprod"
 container_name       = "tfstate"
 key                  = "prod-platform.tfstate"
 use_azuread_auth     = true
