@@ -36,7 +36,7 @@ provider "azurerm" {
       recover_soft_deleted_key_vaults = true
     }
     storage {
-      use_azuread_auth = true
+      use_azuread_authentication = true
     }
   }
 }
