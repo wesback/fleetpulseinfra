@@ -45,12 +45,12 @@ resource "azapi_resource" "storage_share" {
   name      = var.storage_share_name
   parent_id = "${azurerm_storage_account.main.id}/fileServices/default"
 
-  body = jsonencode({
+  body = {
     properties = {
       enabledProtocols = "SMB"
       shareQuota       = var.storage_share_quota_gb
     }
-  })
+  }
 
   depends_on = [azurerm_storage_account.main]
 }
