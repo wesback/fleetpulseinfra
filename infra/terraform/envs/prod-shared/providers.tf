@@ -22,7 +22,7 @@ terraform {
     # storage_account_name  = "stwbtfstateprod"
     # container_name        = "tfstate"
     key = "prod-shared.tfstate"
-    use_azuread_auth     = true
+    #use_azuread_auth     = true
   }
 }
 
