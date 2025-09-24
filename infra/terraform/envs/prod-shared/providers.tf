@@ -22,7 +22,7 @@ terraform {
     # storage_account_name  = "stwbtfstateprod"
     # container_name        = "tfstate"
     key = "prod-shared.tfstate"
-    # use_azuread_auth     = true
+    use_azuread_auth     = true
   }
 }
 
@@ -34,9 +34,6 @@ provider "azurerm" {
     key_vault {
       purge_soft_delete_on_destroy    = true
       recover_soft_deleted_key_vaults = true
-    }
-    storage {
-      use_azuread_auth = true
     }
   }
 }
