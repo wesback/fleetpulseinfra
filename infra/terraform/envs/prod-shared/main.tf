@@ -64,4 +64,4 @@ module "monitor" {
   tags                                 = local.common_tags
   depends_on                           = [module.keyvault]
   store_app_insights_connection_string = false
-}There is a policy in place that prevents key authentication to be enabled on Storage Accounts. Can you update scripts and prep steps in documentation to take this into account?
+}
